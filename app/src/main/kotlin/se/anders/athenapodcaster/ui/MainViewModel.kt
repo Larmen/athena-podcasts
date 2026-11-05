@@ -38,7 +38,8 @@ sealed interface Screen {
     data object AddFeed : Screen
     data class Episodes(val feedId: Long) : Screen
     data object Player : Screen
-    data object Queue : Screen
+    /** [back] is where the Back button and the system back go: the podcast list or the player. */
+    data class Queue(val back: Screen) : Screen
     data object Settings : Screen
     data object Licences : Screen
 }

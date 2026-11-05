@@ -146,7 +146,7 @@ class MainActivity : ComponentActivity() {
             AthenaTheme(appearance.themeMode, appearance.typeface, appearance.textScalePercent) {
               CompositionLocalProvider(LocalArtworkStore provides container.artwork, LocalArtStyle provides settings.artStyle) {
                 // The now-playing strip sits under the podcast and episode screens while an episode is loaded.
-                val showBar = playerState.episodeId != null && !playerState.ended && (screen is Screen.Feeds || screen is Screen.Episodes || screen is Screen.Queue)
+                val showBar = playerState.episodeId != null && !playerState.ended && (screen is Screen.Feeds || screen is Screen.Episodes || (screen is Screen.Queue && (screen as Screen.Queue).back != Screen.Player))
                 Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Box(Modifier.weight(1f)) {
                 when (val current = screen) {
@@ -157,14 +157,14 @@ class MainActivity : ComponentActivity() {
                         onAdd = { feedsViewModel.resetAdd(); viewModel.open(Screen.AddFeed) },
                         onOpen = { id -> feedsViewModel.select(id); viewModel.open(Screen.Episodes(id)) },
                         queueCount = queueRows.size,
-                        onQueue = { viewModel.open(Screen.Queue) },
+                        onQueue = { viewModel.open(Screen.Queue(Screen.Feeds)) },
                         onSettings = { viewModel.open(Screen.Settings) },
                     )
-                    Screen.Queue -> {
-                        BackHandler { viewModel.open(Screen.Feeds) }
+                    is Screen.Queue -> {
+                        BackHandler { viewModel.open(current.back) }
                         QueueScreen(
                             rows = queueRows,
-                            onBack = { viewModel.open(Screen.Feeds) },
+                            onBack = { viewModel.open(current.back) },
                             onPlayNow = { row ->
                                 requestNotificationsOnce()
                                 playerViewModel.play(row.episode, row.feedTitle, row.feedImageUrl) { viewModel.open(Screen.Player) }
@@ -224,6 +224,8 @@ class MainActivity : ComponentActivity() {
                             state = playerState,
                             episode = playerEpisode,
                             artUrls = playerArt,
+                            queueCount = queueRows.size,
+                            onQueue = { viewModel.open(Screen.Queue(Screen.Player)) },
                             onBack = { viewModel.open(backTarget) },
                             onPlayPause = playerViewModel::togglePlayPause,
                             onSeekBack = playerViewModel::seekBack,

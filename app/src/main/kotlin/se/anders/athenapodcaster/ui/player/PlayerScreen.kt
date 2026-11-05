@@ -44,6 +44,8 @@ fun PlayerScreen(
     state: PlayerUiState,
     episode: Episode?,
     artUrls: List<String?>,
+    queueCount: Int,
+    onQueue: () -> Unit,
     onBack: () -> Unit,
     onPlayPause: () -> Unit,
     onSeekBack: () -> Unit,
@@ -60,7 +62,10 @@ fun PlayerScreen(
         )
     }
     Column(Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp)) {
-        TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+        Row {
+            TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+            TextButton(onClick = onQueue) { Text(stringResource(R.string.queue_button, queueCount)) }
+        }
         Spacer(Modifier.height(16.dp))
         if (state.episodeId == null) {
             Text(stringResource(R.string.player_nothing), color = muted())
