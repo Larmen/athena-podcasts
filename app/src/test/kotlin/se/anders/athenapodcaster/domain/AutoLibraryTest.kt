@@ -11,7 +11,9 @@ import se.anders.athenapodcaster.data.db.Episode
 import se.anders.athenapodcaster.data.db.EpisodeWithFeed
 import se.anders.athenapodcaster.playback.AUTO_EMPTY_ID
 import se.anders.athenapodcaster.playback.AUTO_LIST_LIMIT
+import se.anders.athenapodcaster.playback.AUTO_QUEUE_ID
 import se.anders.athenapodcaster.playback.AUTO_ROOT_ID
+import se.anders.athenapodcaster.playback.queueToggleId
 import se.anders.athenapodcaster.playback.AutoLibrary
 import se.anders.athenapodcaster.playback.CarEpisodes
 import se.anders.athenapodcaster.playback.mayBrowseLibrary
@@ -37,23 +39,27 @@ class AutoLibraryTest {
         override suspend fun find(id: Long) = all.firstOrNull { it.episode.id == id }
     }
 
-    private fun lib(vararg e: EpisodeWithFeed) = AutoLibrary(Fake(e.toList()), "Athena Podcasts", "Nothing downloaded yet")
+    private fun lib(vararg e: EpisodeWithFeed, queued: Set<Long> = emptySet()) =
+        AutoLibrary(Fake(e.toList()), "Athena Podcasts", "Nothing downloaded yet", "Add to queue", "Queued · ") { queued }
+
+    /** The episode rows of the root, without the Add to queue folder. */
+    private suspend fun AutoLibrary.eps() = children(AUTO_ROOT_ID, 0, 200)!!.filter { it.id != AUTO_QUEUE_ID }
 
     @Test fun `root is a folder and the list is flat`() = runBlocking {
         val l = lib(ep(1, 10))
         assertTrue(l.root().browsable)
         assertNull(l.children("somewhere-else", 0, 50))
-        assertEquals(listOf("1"), l.children(AUTO_ROOT_ID, 0, 50)!!.map { it.id })
+        assertEquals(listOf("1"), l.eps().map { it.id })
     }
 
     @Test fun `episodes of all podcasts are mixed newest first`() = runBlocking {
         val l = lib(ep(1, 100, "A"), ep(2, 300, "B"), ep(3, 200, "A"))
-        assertEquals(listOf("2", "3", "1"), l.children(AUTO_ROOT_ID, 0, 50)!!.map { it.id })
+        assertEquals(listOf("2", "3", "1"), l.eps().map { it.id })
     }
 
     @Test fun `only downloaded episodes are listed and none can be downloaded or streamed`() = runBlocking {
         val l = lib(ep(1, 100), ep(2, 200, done = false))
-        val rows = l.children(AUTO_ROOT_ID, 0, 50)!!
+        val rows = l.eps()
         assertEquals(listOf("1"), rows.map { it.id })
         assertTrue(rows.all { it.playable && !it.browsable })
         assertNull(l.item("2"))
@@ -61,42 +67,59 @@ class AutoLibraryTest {
 
     @Test fun `played episodes that are still on the phone are listed alike`() = runBlocking {
         val l = lib(ep(1, 100, played = true), ep(2, 200))
-        assertEquals(listOf("2", "1"), l.children(AUTO_ROOT_ID, 0, 50)!!.map { it.id })
+        assertEquals(listOf("2", "1"), l.eps().map { it.id })
     }
 
     @Test fun `the list is capped at 50`() = runBlocking {
         val l = lib(*(1L..80L).map { ep(it, it) }.toTypedArray())
-        val rows = l.children(AUTO_ROOT_ID, 0, 200)!!
+        val rows = l.eps()
         assertEquals(AUTO_LIST_LIMIT, rows.size)
         assertEquals("80", rows.first().id)
         assertEquals("31", rows.last().id)
     }
 
-    @Test fun `paging slices the list`() = runBlocking {
+    @Test fun `paging slices the list, folder first`() = runBlocking {
         val l = lib(*(1L..7L).map { ep(it, it) }.toTypedArray())
-        assertEquals(listOf("7", "6", "5"), l.children(AUTO_ROOT_ID, 0, 3)!!.map { it.id })
-        assertEquals(listOf("1"), l.children(AUTO_ROOT_ID, 2, 3)!!.map { it.id })
+        assertEquals(listOf(AUTO_QUEUE_ID, "7", "6"), l.children(AUTO_ROOT_ID, 0, 3)!!.map { it.id })
+        assertEquals(listOf("2", "1"), l.children(AUTO_ROOT_ID, 2, 3)!!.map { it.id })
         assertTrue(l.children(AUTO_ROOT_ID, 3, 3)!!.isEmpty())
         assertTrue(l.children(AUTO_ROOT_ID, 0, 0)!!.isEmpty())
+    }
+
+    @Test fun `the first row is the Add to queue folder`() = runBlocking {
+        val first = lib(ep(1, 1)).children(AUTO_ROOT_ID, 0, 50)!!.first()
+        assertEquals(AUTO_QUEUE_ID, first.id)
+        assertTrue(first.browsable && !first.playable)
+        assertEquals("Add to queue", first.title)
+    }
+
+    @Test fun `the folder lists the same episodes, marks queued ones and toggles by q-ids`() = runBlocking {
+        val l = lib(ep(1, 100), ep(2, 200), queued = setOf(1L))
+        val rows = l.children(AUTO_QUEUE_ID, 0, 50)!!
+        assertEquals(listOf(queueToggleId(2), queueToggleId(1)), rows.map { it.id })
+        assertEquals(listOf("Episode 2", "Queued · Episode 1"), rows.map { it.title })
+        assertTrue(rows.all { it.playable })
+        assertEquals("Queued · Episode 1", l.item(queueToggleId(1))!!.title)
+        assertNull(l.item(queueToggleId(99)))
     }
 
     @Test fun `nothing downloaded shows one plain line that cannot be played`() = runBlocking {
         val l = lib(ep(1, 1, done = false))
         val rows = l.children(AUTO_ROOT_ID, 0, 50)!!
         assertEquals(1, rows.size)
-        assertEquals("Nothing downloaded yet", rows.single().title)
+        assertEquals("Nothing downloaded yet", rows.single().title) // no folder when there is nothing to queue
         assertEquals(AUTO_EMPTY_ID, rows.single().id)
         assertFalse(rows.single().playable)
         assertTrue(l.children(AUTO_ROOT_ID, 1, 50)!!.isEmpty())
     }
 
     @Test fun `rows carry title, show, duration and art candidates`() = runBlocking {
-        val r = lib(ep(7, 1, "The Show", dur = 90)).children(AUTO_ROOT_ID, 0, 50)!!.single()
+        val r = lib(ep(7, 1, "The Show", dur = 90)).eps().single()
         assertEquals("Episode 7", r.title)
         assertEquals("The Show", r.subtitle)
         assertEquals(90_000L, r.durationMs)
         assertEquals(listOf<String?>("ep7", "feed-art"), r.artUrls)
-        assertNull(lib(ep(8, 1, dur = null)).children(AUTO_ROOT_ID, 0, 50)!!.single().durationMs)
+        assertNull(lib(ep(8, 1, dur = null)).eps().single().durationMs)
     }
 
     @Test fun `item lookup refuses unknown ids`() = runBlocking {

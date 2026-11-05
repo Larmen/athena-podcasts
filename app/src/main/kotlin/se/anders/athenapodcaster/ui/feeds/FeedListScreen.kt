@@ -43,6 +43,8 @@ fun FeedListScreen(
     onRefresh: () -> Unit,
     onAdd: () -> Unit,
     onOpen: (Long) -> Unit,
+    queueCount: Int,
+    onQueue: () -> Unit,
     onSettings: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -56,6 +58,7 @@ fun FeedListScreen(
             TextButton(onClick = onRefresh, enabled = !refreshing) {
                 Text(stringResource(if (refreshing) R.string.refreshing else R.string.refresh))
             }
+            TextButton(onClick = onQueue) { Text(stringResource(R.string.queue_button, queueCount)) }
             TextButton(onClick = onSettings) { Text(stringResource(R.string.settings_title)) }
         }
         if (feeds.isEmpty()) {

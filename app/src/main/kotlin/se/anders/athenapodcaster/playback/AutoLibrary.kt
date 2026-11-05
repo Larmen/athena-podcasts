@@ -5,6 +5,12 @@ import se.anders.athenapodcaster.data.db.EpisodeWithFeed
 const val AUTO_ROOT_ID = "root"
 const val AUTO_EMPTY_ID = "empty"
 
+/** FR-107: the folder in which a tap puts an episode into the queue (or takes it out) instead of playing it. */
+const val AUTO_QUEUE_ID = "queue-add"
+const val QUEUE_TOGGLE_PREFIX = "q:"
+
+fun queueToggleId(episodeId: Long) = QUEUE_TOGGLE_PREFIX + episodeId
+
 /** FR-081: the car list never shows more than this many episodes. */
 const val AUTO_LIST_LIMIT = 50
 
@@ -36,24 +42,39 @@ class AutoLibrary(
     private val source: CarEpisodes,
     private val rootTitle: String,
     private val emptyText: String,
+    private val addToQueueTitle: String = "Add to queue",
+    private val queuedMark: String = "Queued · ",
+    private val queuedIds: suspend () -> Set<Long> = { emptySet() },
 ) {
     fun root() = CarRow(id = AUTO_ROOT_ID, title = rootTitle, browsable = true)
 
     /** The rows under [parentId] for one page, or null when [parentId] is not a list (only the root is). */
     suspend fun children(parentId: String, page: Int, pageSize: Int): List<CarRow>? {
+        if (parentId == AUTO_QUEUE_ID) return queueChildren().drop(maxOf(page, 0) * maxOf(pageSize, 0)).take(maxOf(pageSize, 0))
         if (parentId != AUTO_ROOT_ID) return null
         if (page < 0 || pageSize <= 0) return emptyList()
         val all = source.downloaded(AUTO_LIST_LIMIT)
         if (all.isEmpty()) return if (page == 0) listOf(emptyRow()) else emptyList()
-        return all.drop(page * pageSize).take(pageSize).map(::rowOf)
+        return (listOf(queueFolder()) + all.map(::rowOf)).drop(page * pageSize).take(pageSize)
+    }
+
+    /** The rows of the Add to queue folder: the same episodes, a tap toggles the queue (FR-107). */
+    suspend fun queueChildren(): List<CarRow> {
+        val queued = queuedIds()
+        return source.downloaded(AUTO_LIST_LIMIT).map { e ->
+            rowOf(e).let { it.copy(id = queueToggleId(e.episode.id), title = (if (e.episode.id in queued) queuedMark else "") + it.title) }
+        }
     }
 
     /** One item by id: the root, the empty line, or a downloaded episode; null for anything else (FR-024). */
     suspend fun item(id: String): CarRow? = when (id) {
         AUTO_ROOT_ID -> root()
         AUTO_EMPTY_ID -> emptyRow()
-        else -> id.toLongOrNull()?.let { source.find(it) }?.takeIf { it.episode.filePath != null }?.let(::rowOf)
+        AUTO_QUEUE_ID -> queueFolder()
+        else -> if (id.startsWith(QUEUE_TOGGLE_PREFIX)) queueChildren().firstOrNull { it.id == id } else id.toLongOrNull()?.let { source.find(it) }?.takeIf { it.episode.filePath != null }?.let(::rowOf)
     }
+
+    private fun queueFolder() = CarRow(id = AUTO_QUEUE_ID, title = addToQueueTitle, browsable = true)
 
     private fun emptyRow() = CarRow(id = AUTO_EMPTY_ID, title = emptyText)
 

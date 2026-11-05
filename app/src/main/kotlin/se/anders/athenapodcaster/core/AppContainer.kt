@@ -12,6 +12,7 @@ import se.anders.athenapodcaster.data.refresh.Sync
 import se.anders.athenapodcaster.data.secrets.KeystoreSecretStore
 import se.anders.athenapodcaster.data.secrets.SecretStore
 import se.anders.athenapodcaster.data.episodes.EpisodeRepository
+import se.anders.athenapodcaster.data.episodes.QueueRepository
 import se.anders.athenapodcaster.data.feeds.FeedFetcher
 import se.anders.athenapodcaster.data.feeds.FeedRepository
 import se.anders.athenapodcaster.data.settings.SettingsRepository
@@ -26,6 +27,7 @@ class AppContainer(context: Context) {
     val database: AppDatabase by lazy { AppDatabase.create(appContext, secrets) }
     val feeds: FeedRepository by lazy { FeedRepository(database, FeedFetcher(), secrets) }
     val episodes: EpisodeRepository by lazy { EpisodeRepository(database) }
+    val queue: QueueRepository by lazy { QueueRepository(database) }
     val player: PlayerController by lazy { PlayerController(appContext) }
     val notifier: Notifier by lazy { Notifier(appContext) }
     val launcherAppearance: LauncherAppearanceSource by lazy { LauncherAppearanceSource(appContext) }

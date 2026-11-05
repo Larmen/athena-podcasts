@@ -10,16 +10,25 @@ import se.anders.athenapodcaster.data.feeds.redactUrl
 import se.anders.athenapodcaster.data.feeds.urlHash
 import se.anders.athenapodcaster.data.secrets.SecretStore
 
-@Database(entities = [Feed::class, Episode::class], version = 3, exportSchema = true)
+@Database(entities = [Feed::class, Episode::class, QueueItem::class], version = 4, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun feedDao(): FeedDao
     abstract fun episodeDao(): EpisodeDao
+    abstract fun queueDao(): QueueDao
 
     companion object {
         fun create(context: Context, secrets: SecretStore): AppDatabase =
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "podcaster.db")
-                .addMigrations(migration1To2(secrets), MIGRATION_2_3)
+                .addMigrations(migration1To2(secrets), MIGRATION_2_3, MIGRATION_3_4)
                 .build()
+
+        /** v4 (T9.1): the play queue. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `queue_items` (`episodeId` INTEGER NOT NULL, `position` INTEGER NOT NULL, PRIMARY KEY(`episodeId`), FOREIGN KEY(`episodeId`) REFERENCES `episodes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_queue_items_position` ON `queue_items` (`position`)")
+            }
+        }
 
         /** v3 (T6.1): episodes can have their own cover art. */
         val MIGRATION_2_3 = object : Migration(2, 3) {

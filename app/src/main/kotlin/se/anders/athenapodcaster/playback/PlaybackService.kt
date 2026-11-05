@@ -1,6 +1,7 @@
 package se.anders.athenapodcaster.playback
 
 import android.app.PendingIntent
+import java.io.File
 import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import com.google.common.util.concurrent.SettableFuture
 import se.anders.athenapodcaster.data.art.ArtworkStore
+import se.anders.athenapodcaster.data.db.EpisodeWithFeed
 import android.os.Bundle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +41,7 @@ import se.anders.athenapodcaster.AthenaPodcasterApplication
 import se.anders.athenapodcaster.MainActivity
 import se.anders.athenapodcaster.R
 import se.anders.athenapodcaster.data.episodes.EpisodeRepository
+import se.anders.athenapodcaster.domain.Progress
 import se.anders.athenapodcaster.domain.progressFor
 
 /** Sent by the notification and lock-screen widget: open the app on the player. */
@@ -48,6 +51,7 @@ const val SEEK_BACK_MS = 10_000L
 const val SEEK_FORWARD_MS = 30_000L
 private const val SAVE_INTERVAL_MS = 5_000L
 private const val LIST_ART_PX = 160
+private const val MIRRORED_UPCOMING = 10
 
 /**
  * Plays downloaded episodes (FR-020..024). A foreground media service, so audio continues with the screen off
@@ -59,6 +63,9 @@ private const val LIST_ART_PX = 160
 @OptIn(UnstableApi::class) // FileDataSource / DefaultMediaSourceFactory: Media3's documented way to restrict sources
 class PlaybackService : MediaLibraryService() {
     private var session: MediaLibrarySession? = null
+    private var exo: ExoPlayer? = null
+    private var queueRows: List<EpisodeWithFeed> = emptyList()
+    private var syncJob: Job? = null
     private val container get() = (application as AthenaPodcasterApplication).container
     private lateinit var library: AutoLibrary
     private val carArt = HashMap<String, ByteArray?>()
@@ -78,6 +85,7 @@ class PlaybackService : MediaLibraryService() {
             .setSeekBackIncrementMs(SEEK_BACK_MS)
             .setSeekForwardIncrementMs(SEEK_FORWARD_MS)
             .build()
+        exo = player
         // Headset and Bluetooth next / previous keys skip 30 s forward / 10 s back (there is no next episode to go to).
         // Tapping the notification or the lock-screen Now Playing widget opens the app on the player.
         val openPlayer = PendingIntent.getActivity(
@@ -87,7 +95,10 @@ class PlaybackService : MediaLibraryService() {
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        library = AutoLibrary(container.episodes, getString(R.string.app_name), getString(R.string.auto_nothing_downloaded))
+        library = AutoLibrary(
+            container.episodes, getString(R.string.app_name), getString(R.string.auto_nothing_downloaded),
+            getString(R.string.auto_add_to_queue), getString(R.string.auto_queued_mark),
+        ) { container.queue.observeIds().first().toSet() }
         val mediaSession = MediaLibrarySession.Builder(this, SkipPlayer(player), LibraryCallback())
             .setSessionActivity(openPlayer).build()
         // Notification and lock screen show 10 s back and 30 s forward (spec FR-021).
@@ -105,6 +116,15 @@ class PlaybackService : MediaLibraryService() {
         )
         session = mediaSession
         player.addListener(ProgressSaver(player))
+        // FR-103: the player's upcoming items follow the queue (and a new current item).
+        scope.launch {
+            container.queue.observe().collect { rows ->
+                queueRows = rows
+                carArt.clear()
+                mediaSession.notifyChildrenChanged(AUTO_QUEUE_ID, AUTO_LIST_LIMIT, null)
+                syncUpcoming()
+            }
+        }
         // FR-081: an open car list follows downloads finishing and files being deleted.
         scope.launch {
             container.episodes.observeDownloadedIds(AUTO_LIST_LIMIT).distinctUntilChanged().collect {
@@ -115,6 +135,32 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
+
+    /**
+     * FR-103: makes the player's items after the current one equal the queue (the first [MIRRORED_UPCOMING] of it,
+     * without the episode now playing). Cheap and idempotent: it does nothing when they already match.
+     */
+    private fun syncUpcoming() {
+        val player = exo ?: return
+        if (player.mediaItemCount == 0) return
+        val currentId = player.currentMediaItem?.mediaId
+        val wanted = queueRows.filter { it.episode.id.toString() != currentId }.take(MIRRORED_UPCOMING)
+        val first = player.currentMediaItemIndex + 1
+        val have = (first until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId }
+        if (have == wanted.map { it.episode.id.toString() }) return
+        syncJob?.cancel()
+        syncJob = scope.launch {
+            val style = container.settings.settings.first().artStyle
+            val items = wanted.mapNotNull { row ->
+                val file = row.episode.filePath?.let(::File)?.takeIf { it.isFile } ?: return@mapNotNull null
+                val art = container.artwork.mediaBytes(listOf(row.episode.imageUrl, row.feedImageUrl), style, LIST_ART_PX)
+                episodeMediaItem(row.episode.id, row.episode.title, row.feedTitle, file, art)
+            }
+            // The player may have moved on while the covers were read; the next trigger will sync again.
+            if (player.currentMediaItem?.mediaId != currentId || player.currentMediaItemIndex + 1 != first) return@launch
+            player.replaceMediaItems(first, player.mediaItemCount, items)
+        }
+    }
 
     /** Runs [block] on the service scope and hands its result (or failure) to Media3 as a future. */
     private fun <T> futureOf(block: suspend () -> T): ListenableFuture<T> {
@@ -205,6 +251,23 @@ class PlaybackService : MediaLibraryService() {
             if (mediaItems.all { it.localConfiguration != null }) {
                 return super.onSetMediaItems(mediaSession, controller, mediaItems, startIndex, startPositionMs)
             }
+            val requested = mediaItems.singleOrNull()?.mediaId
+            if (requested != null && requested.startsWith(QUEUE_TOGGLE_PREFIX)) {
+                // FR-107: a tap in the Add to queue folder edits the queue and leaves playback as it is.
+                return futureOf {
+                    requested.removePrefix(QUEUE_TOGGLE_PREFIX).toLongOrNull()?.let { container.queue.toggle(it) }
+                    session?.notifyChildrenChanged(AUTO_QUEUE_ID, AUTO_LIST_LIMIT, null)
+                    val player = exo
+                    if (player == null || player.mediaItemCount == 0) {
+                        MediaSession.MediaItemsWithStartPosition(emptyList(), C.INDEX_UNSET, C.TIME_UNSET)
+                    } else {
+                        MediaSession.MediaItemsWithStartPosition(
+                            (0 until player.mediaItemCount).map { player.getMediaItemAt(it) },
+                            player.currentMediaItemIndex, player.currentPosition,
+                        )
+                    }
+                }
+            }
             return futureOf {
                 val id = mediaItems.singleOrNull()?.mediaId?.toLongOrNull()
                     ?: throw UnsupportedOperationException("Not an episode")
@@ -280,6 +343,40 @@ class PlaybackService : MediaLibraryService() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED) save(ended = true)
+        }
+
+        /** FR-103, FR-106: moving to the next queued episode marks the finished one played; any other jump saves its position. */
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, @Player.DiscontinuityReason reason: Int,
+        ) {
+            val oldId = oldPosition.mediaItem?.mediaId?.toLongOrNull() ?: return
+            if (oldPosition.mediaItem?.mediaId == newPosition.mediaItem?.mediaId) return
+            val progress = if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) Progress(0, played = true)
+            else Progress(oldPosition.positionMs.coerceAtLeast(0), played = false)
+            scope.launch { episodes.saveProgress(oldId, progress) }
+        }
+
+        /** The episode now playing leaves the queue (FR-103, FR-104); a queued episode resumes at its saved position. */
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val id = mediaItem?.mediaId?.toLongOrNull()
+            if (id != null) {
+                scope.launch {
+                    container.queue.remove(id)
+                    if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                        val saved = episodes.get(id)?.positionMs ?: 0
+                        if (saved > 0 && player.currentMediaItem?.mediaId == mediaItem.mediaId) player.seekTo(saved)
+                    }
+                }
+            }
+            syncUpcoming()
+        }
+
+        /** A queued file that cannot be read must not stop the whole queue (FR-024): drop it and go on. */
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            val id = player.currentMediaItem?.mediaId?.toLongOrNull()
+            val gone = player.currentMediaItem?.localConfiguration?.uri?.path?.let { !File(it).isFile } ?: false
+            if (id != null && gone) scope.launch { episodes.fileMissing(id); container.queue.remove(id) }
+            if (gone && player.hasNextMediaItem()) { player.seekToNextMediaItem(); player.prepare(); player.play() }
         }
 
         private fun save(ended: Boolean) {

@@ -53,3 +53,14 @@ data class Episode(
     val downloadTotalBytes: Long = 0,
     val imageUrl: String? = null,
 )
+
+/** An episode waiting in the play queue (spec §6, FR-100). Rows disappear with their episode. */
+@Entity(
+    tableName = "queue_items",
+    foreignKeys = [ForeignKey(entity = Episode::class, parentColumns = ["id"], childColumns = ["episodeId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("position")],
+)
+data class QueueItem(
+    @PrimaryKey val episodeId: Long,
+    val position: Int,
+)

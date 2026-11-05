@@ -6,6 +6,7 @@ import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
@@ -119,4 +120,41 @@ interface EpisodeDao {
 
     @Update
     suspend fun updateAll(episodes: List<Episode>)
+}
+
+@Dao
+abstract class QueueDao {
+    /** The queue as the player may use it: downloaded, unplayed episodes only, in order (FR-100, FR-105). */
+    @Query(
+        """
+        SELECT e.*, f.title AS feedTitle, f.imageUrl AS feedImageUrl
+        FROM queue_items q JOIN episodes e ON e.id = q.episodeId JOIN feeds f ON f.id = e.feedId
+        WHERE e.downloadState = 'Done' AND e.played = 0 ORDER BY q.position
+        """,
+    )
+    abstract fun observe(): Flow<List<EpisodeWithFeed>>
+
+    @Query(
+        """
+        SELECT q.episodeId FROM queue_items q JOIN episodes e ON e.id = q.episodeId
+        WHERE e.downloadState = 'Done' AND e.played = 0 ORDER BY q.position
+        """,
+    )
+    abstract suspend fun playableIds(): List<Long>
+
+    @Query("DELETE FROM queue_items")
+    abstract suspend fun deleteAll()
+
+    @Query("DELETE FROM queue_items WHERE episodeId = :id")
+    abstract suspend fun delete(id: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insertAll(items: List<QueueItem>)
+
+    /** Stores exactly [ids] in this order (rows for unplayable episodes are dropped by not being listed). */
+    @Transaction
+    open suspend fun replaceAll(ids: List<Long>) {
+        deleteAll()
+        insertAll(ids.mapIndexed { i, id -> QueueItem(id, i) })
+    }
 }

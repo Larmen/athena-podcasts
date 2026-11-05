@@ -31,6 +31,8 @@ import se.anders.athenapodcaster.ui.components.LocalArtworkStore
 import se.anders.athenapodcaster.ui.licences.LicencesScreen
 import se.anders.athenapodcaster.playback.ACTION_OPEN_PLAYER
 import se.anders.athenapodcaster.ui.FeedsViewModel
+import se.anders.athenapodcaster.ui.QueueViewModel
+import se.anders.athenapodcaster.ui.queue.QueueScreen
 import se.anders.athenapodcaster.ui.MainViewModel
 import se.anders.athenapodcaster.ui.PlayerViewModel
 import se.anders.athenapodcaster.ui.player.NowPlayingBar
@@ -47,6 +49,7 @@ import se.anders.athenapodcaster.ui.theme.useDarkTheme
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels { MainViewModel.Factory }
     private val feedsViewModel: FeedsViewModel by viewModels { FeedsViewModel.Factory }
+    private val queueViewModel: QueueViewModel by viewModels { QueueViewModel.Factory }
     private val playerViewModel: PlayerViewModel by viewModels { PlayerViewModel.Factory }
 
     override fun onNewIntent(intent: Intent) {
@@ -100,6 +103,8 @@ class MainActivity : ComponentActivity() {
             }
 
             val feeds by feedsViewModel.feeds.collectAsStateWithLifecycle()
+            val queueRows by queueViewModel.rows.collectAsStateWithLifecycle()
+            val queuedIds by queueViewModel.ids.collectAsStateWithLifecycle()
             val selectedFeed by feedsViewModel.selectedFeed.collectAsStateWithLifecycle()
             val episodes by feedsViewModel.selectedEpisodes.collectAsStateWithLifecycle()
             val refreshing by feedsViewModel.refreshing.collectAsStateWithLifecycle()
@@ -141,7 +146,7 @@ class MainActivity : ComponentActivity() {
             AthenaTheme(appearance.themeMode, appearance.typeface, appearance.textScalePercent) {
               CompositionLocalProvider(LocalArtworkStore provides container.artwork, LocalArtStyle provides settings.artStyle) {
                 // The now-playing strip sits under the podcast and episode screens while an episode is loaded.
-                val showBar = playerState.episodeId != null && !playerState.ended && (screen is Screen.Feeds || screen is Screen.Episodes)
+                val showBar = playerState.episodeId != null && !playerState.ended && (screen is Screen.Feeds || screen is Screen.Episodes || screen is Screen.Queue)
                 Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Box(Modifier.weight(1f)) {
                 when (val current = screen) {
@@ -151,8 +156,25 @@ class MainActivity : ComponentActivity() {
                         onRefresh = feedsViewModel::refreshAll,
                         onAdd = { feedsViewModel.resetAdd(); viewModel.open(Screen.AddFeed) },
                         onOpen = { id -> feedsViewModel.select(id); viewModel.open(Screen.Episodes(id)) },
+                        queueCount = queueRows.size,
+                        onQueue = { viewModel.open(Screen.Queue) },
                         onSettings = { viewModel.open(Screen.Settings) },
                     )
+                    Screen.Queue -> {
+                        BackHandler { viewModel.open(Screen.Feeds) }
+                        QueueScreen(
+                            rows = queueRows,
+                            onBack = { viewModel.open(Screen.Feeds) },
+                            onPlayNow = { row ->
+                                requestNotificationsOnce()
+                                playerViewModel.play(row.episode, row.feedTitle, row.feedImageUrl) { viewModel.open(Screen.Player) }
+                            },
+                            onRemove = { queueViewModel.remove(it) },
+                            onMoveUp = { queueViewModel.moveUp(it) },
+                            onMoveDown = { queueViewModel.moveDown(it) },
+                            onClear = { queueViewModel.clear() },
+                        )
+                    }
                     Screen.AddFeed -> {
                         BackHandler { viewModel.open(Screen.Feeds) }
                         AddFeedScreen(
@@ -178,6 +200,8 @@ class MainActivity : ComponentActivity() {
                                 requestNotificationsOnce()
                                 playerViewModel.play(episode, selectedFeed?.title.orEmpty(), selectedFeed?.imageUrl) { viewModel.open(Screen.Player) }
                             },
+                            queuedIds = queuedIds,
+                            onToggleQueue = { queueViewModel.toggle(it.id) },
                             onMarkUnplayed = feedsViewModel::setUnplayed,
                             onMarkPlayed = feedsViewModel::markPlayed,
                             onMarkAllPlayed = { feedsViewModel.markAllPlayed(current.feedId) },

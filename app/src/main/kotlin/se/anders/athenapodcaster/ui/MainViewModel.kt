@@ -38,6 +38,7 @@ sealed interface Screen {
     data object AddFeed : Screen
     data class Episodes(val feedId: Long) : Screen
     data object Player : Screen
+    data object Queue : Screen
     data object Settings : Screen
     data object Licences : Screen
 }

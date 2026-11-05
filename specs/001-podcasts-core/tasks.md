@@ -80,12 +80,12 @@ Order matters. Each task leaves the app building. `[P]` = can run in parallel wi
 - [x] T8.8 (2026-11-05) README (sideloading with Unknown sources, FR-089) and `docs/manual-qa.md` (real car, steering-wheel keys, phone call during playback, no network)
 
 ## Phase 9 – Play queue (US8) · FR-100..108
-- [ ] T9.1 `QueueItem` entity + DAO, DB v4, `MIGRATION_3_4`, exported schema, migration test (FR-100)
-- [ ] T9.2 Pure `QueueOrder` (add, remove, move up/down, purge) + JVM tests; `QueueRepository` with the joined, filtered read (FR-100, 101, 105)
-- [ ] T9.3 Service: `QueueSync` mirrors the queue into the player's upcoming items (first 10, small covers); advancing marks the old episode played and removes the new one from the queue; `ProgressSaver` handles transitions and skips (FR-103, 104, 106, 108)
-- [ ] T9.4 Purge hooks: mark played, mark all played, delete download, cleanup, unsubscribe, missing file (FR-105)
-- [ ] T9.5 UI: Add/Remove from queue on episode rows and the player; `Queue (n)` button; `QueueScreen` with Play now / Remove / Move up / Move down / Clear (confirm); strings, labels, 200 % font check (FR-101, 102)
-- [ ] T9.6 Android Auto: `Add to queue` folder with toggle-on-tap (`q:<id>`, "Queued · " mark, no playback restart); the Queue button shows the upcoming items and jumps to a chosen one; the browse list and play-now keep the queue; check on the DHU, mainly that audio does not glitch (FR-104, 107)
-- [ ] T9.7 Emulator tests (repository, advance-by-itself, play-now keeps queue, Auto timeline) and full suites, lint
-- [ ] T9.8 Manual: lock screen after an advance, DHU Queue button, the bike; README and `docs/manual-qa.md`
+- [x] T9.1 (2026-11-05; migration test 3→4 incl. cascade) `QueueItem` entity + DAO, DB v4, `MIGRATION_3_4`, exported schema, migration test (FR-100)
+- [x] T9.2 (2026-11-05; 4 JVM tests, 6 emulator tests against Room) Pure `QueueOrder` (add, remove, move up/down, purge) + JVM tests; `QueueRepository` with the joined, filtered read (FR-100, 101, 105)
+- [x] T9.3 (2026-11-05; emulator: next episode starts by itself, finished one marked played, queued episode resumes at its saved position, play-now keeps the queue, a deleted download is skipped) Service: `QueueSync` mirrors the queue into the player's upcoming items (first 10, small covers); advancing marks the old episode played and removes the new one from the queue; `ProgressSaver` handles transitions and skips (FR-103, 104, 106, 108)
+- [x] T9.4 (2026-11-05) Done differently and simpler: the queue is read through a join that keeps only downloaded, unplayed episodes, so every purge event (played, deleted, missing file, unsubscribe via cascade) takes effect without separate hooks; the next queue change drops stale rows Purge hooks: mark played, mark all played, delete download, cleanup, unsubscribe, missing file (FR-105)
+- [~] T9.5 (2026-11-05; Queue screen checked empty on the emulator; the row buttons and the episode-row buttons were not looked at on a screen, and not at 200 % font) UI: Add/Remove from queue on episode rows and the player; `Queue (n)` button; `QueueScreen` with Play now / Remove / Move up / Move down / Clear (confirm); strings, labels, 200 % font check (FR-101, 102)
+- [~] T9.6 (2026-11-05; 3 emulator tests: folder first, a tap queues without a position jump or restart, the player timeline holds current + upcoming and a jump works. Not yet seen on the Desktop Head Unit) Android Auto: `Add to queue` folder with toggle-on-tap (`q:<id>`, "Queued · " mark, no playback restart); the Queue button shows the upcoming items and jumps to a chosen one; the browse list and play-now keep the queue; check on the DHU, mainly that audio does not glitch (FR-104, 107)
+- [x] T9.7 (2026-11-05; 109 JVM, 71 emulator tests, lint clean) Emulator tests (repository, advance-by-itself, play-now keeps queue, Auto timeline) and full suites, lint
+- [~] T9.8 (2026-11-05) README and QA list updated; the lock screen after an advance, the DHU Queue button and the bike are still to be tried Manual: lock screen after an advance, DHU Queue button, the bike; README and `docs/manual-qa.md`
 

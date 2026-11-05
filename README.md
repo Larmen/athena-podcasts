@@ -26,8 +26,13 @@ keytool -genkeypair -v -keystore athena-release.jks -alias athena -keyalg RSA -k
 
 Keep the keystore and its passwords out of the repository (`*.jks` is already ignored). A manual test list is in `docs/manual-qa.md`.
 
+## Queue
+Every downloaded, unplayed episode has an **Add to queue** button. **Queue (n)** on the podcast list opens the queue, where each entry has Play now, Remove, Move up and Move down, and Clear queue empties it. When an episode ends, the next queued one starts by itself and leaves the queue; with an empty queue playback stops. Tapping Play on an episode plays it now and keeps the queue.
+
 ## Android Auto
 Athena Podcasts shows up in Android Auto as a media app with one flat list: every downloaded episode of every podcast, newest first (at most 50). Tap one to play; play/pause, back 10 s and forward 30 s are on the player screen, and steering-wheel or handlebar media keys do the same. Nothing is streamed, so it works without mobile data.
+
+The first row of the car list is **Add to queue**: open it and tap an episode to queue it (tap again to unqueue; queued ones are marked). The car's own Queue button shows what is playing and what is next. Reordering and clearing the queue are done on the phone.
 
 Because the app is sideloaded, Android Auto hides it until you allow unknown sources: on the phone open Android Auto settings, tap **Version** ten times to enable developer mode, open the three-dot menu → **Developer settings**, and turn on **Unknown sources**. Reconnect to the car or mount afterwards.
 

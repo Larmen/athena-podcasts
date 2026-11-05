@@ -10,6 +10,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -23,7 +24,9 @@ import se.anders.athenapodcaster.data.db.DownloadState
 import se.anders.athenapodcaster.data.db.Episode
 import se.anders.athenapodcaster.data.db.Feed
 import se.anders.athenapodcaster.playback.AUTO_LIST_LIMIT
+import se.anders.athenapodcaster.playback.AUTO_QUEUE_ID
 import se.anders.athenapodcaster.playback.AUTO_ROOT_ID
+import se.anders.athenapodcaster.playback.queueToggleId
 import se.anders.athenapodcaster.playback.PlaybackService
 
 /** Android Auto library (T8.2..T8.6): a browser talks to the real service, as the car does. */
@@ -41,6 +44,7 @@ class AutoBrowseTest {
     fun setUp() {
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
         browser = MediaBrowser.Builder(context, token).buildAsync().get(15, TimeUnit.SECONDS)
+        runBlocking { container.queue.clear() }
         instrumentation.runOnMainSync { browser.stop(); browser.clearMediaItems() } // the service outlives tests
         Thread.sleep(300)
     }
@@ -48,7 +52,7 @@ class AutoBrowseTest {
     @After
     fun tearDown() {
         instrumentation.runOnMainSync { browser.stop(); browser.clearMediaItems(); browser.release() }
-        runBlocking { feedIds.forEach { container.database.feedDao().delete(it) } }
+        runBlocking { container.queue.clear(); feedIds.forEach { container.database.feedDao().delete(it) } }
         files.forEach { it.delete() }
     }
 
@@ -90,6 +94,9 @@ class AutoBrowseTest {
         return result
     }
 
+    /** The episode rows, without the Add to queue folder. */
+    private fun episodeRows() = children().filter { it.mediaId != AUTO_QUEUE_ID }
+
     private fun waitFor(what: String, timeoutMs: Long = 15_000, condition: () -> Boolean) {
         val end = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < end) { if (condition()) return; Thread.sleep(100) }
@@ -108,13 +115,13 @@ class AutoBrowseTest {
         assertEquals(0, root.resultCode)
         assertTrue(root.value!!.mediaMetadata.isBrowsable == true)
 
-        val ours = children().take(3)
+        val ours = episodeRows().take(3)
         assertEquals(listOf(new, mid, old).map { it.toString() }, ours.map { it.mediaId })
-        assertFalse(children().any { it.mediaId == notYet.toString() })
+        assertFalse(episodeRows().any { it.mediaId == notYet.toString() })
         assertEquals("New B", ours[0].mediaMetadata.title)
         assertEquals("Show B", ours[0].mediaMetadata.subtitle)
         assertTrue(ours.all { it.mediaMetadata.isPlayable == true })
-        assertTrue(children().size <= AUTO_LIST_LIMIT)
+        assertTrue(episodeRows().size <= AUTO_LIST_LIMIT)
     }
 
     @Test
@@ -184,8 +191,74 @@ class AutoBrowseTest {
         val start = System.nanoTime()
         val rows = children()
         val ms = (System.nanoTime() - start) / 1_000_000
-        assertEquals(AUTO_LIST_LIMIT, rows.size)
+        assertEquals(AUTO_LIST_LIMIT + 1, rows.size) // the folder and 50 episodes
         assertNotNull(rows.first().mediaId)
         assertTrue("browsing took $ms ms", ms < 500)
+    }
+
+    private fun playFromCar(id: Long) {
+        instrumentation.runOnMainSync {
+            browser.setMediaItem(MediaItem.Builder().setMediaId(id.toString()).build())
+            browser.prepare(); browser.play()
+        }
+        waitFor("playing") { var p = false; instrumentation.runOnMainSync { p = browser.isPlaying }; p }
+    }
+
+    private fun position(): Long { var p = 0L; instrumentation.runOnMainSync { p = browser.currentPosition }; return p }
+    private fun queuedIds() = runBlocking { container.queue.observeIds().first() }
+
+    @Test
+    fun theFirstRowIsTheAddToQueueFolder() {
+        val f = newFeed("Show"); newEpisode(f, "One", far, downloaded = true)
+        val first = children().first()
+        assertEquals(AUTO_QUEUE_ID, first.mediaId)
+        assertTrue(first.mediaMetadata.isBrowsable == true)
+        assertEquals("Add to queue", first.mediaMetadata.title)
+    }
+
+    @Test
+    fun aTapInTheAddToQueueFolderQueuesWithoutInterruptingPlayback() {
+        val f = newFeed("Show")
+        val playing = newEpisode(f, "Playing", far, downloaded = true, position = 120_000)
+        val other = newEpisode(f, "Other", far - 1, downloaded = true)
+        playFromCar(playing)
+        val before = position()
+        assertTrue("started at $before", before in 119_000..130_000)
+
+        instrumentation.runOnMainSync {
+            browser.setMediaItem(MediaItem.Builder().setMediaId(queueToggleId(other)).build())
+            browser.prepare(); browser.play()
+        }
+        waitFor("episode queued") { queuedIds() == listOf(other) }
+        Thread.sleep(1500)
+        val after = position()
+        var playingNow = false; var currentId: String? = null
+        instrumentation.runOnMainSync { playingNow = browser.isPlaying; currentId = browser.currentMediaItem?.mediaId }
+        assertEquals(playing.toString(), currentId)
+        assertTrue("still playing", playingNow)
+        assertTrue("position continued ($before -> $after), no restart", after in (before + 500)..(before + 8_000))
+
+        val inFolder = onMain { browser.getChildren(AUTO_QUEUE_ID, 0, 50, null) }.value!!
+        assertEquals("Queued · Other", inFolder.first { it.mediaId == queueToggleId(other) }.mediaMetadata.title)
+
+        // A second tap takes it out again.
+        instrumentation.runOnMainSync { browser.setMediaItem(MediaItem.Builder().setMediaId(queueToggleId(other)).build()) }
+        waitFor("episode unqueued") { queuedIds().isEmpty() }
+    }
+
+    @Test
+    fun theCarsQueueShowsTheCurrentAndUpcomingEpisodesAndCanJump() {
+        val f = newFeed("Show")
+        val a = newEpisode(f, "A", far, downloaded = true)
+        val b = newEpisode(f, "B", far - 1, downloaded = true)
+        val c = newEpisode(f, "C", far - 2, downloaded = true)
+        runBlocking { container.queue.add(b); container.queue.add(c) }
+        playFromCar(a)
+        fun ids(): List<String> { var l = emptyList<String>(); instrumentation.runOnMainSync { l = (0 until browser.mediaItemCount).map { browser.getMediaItemAt(it).mediaId } }; return l }
+        waitFor("queue mirrored in the player") { ids() == listOf(a, b, c).map { it.toString() } }
+        // Choosing an entry in the car's Queue view jumps to it.
+        instrumentation.runOnMainSync { browser.seekToDefaultPosition(2) }
+        waitFor("jumped to c") { var id: String? = null; instrumentation.runOnMainSync { id = browser.currentMediaItem?.mediaId }; id == c.toString() }
+        waitFor("c left the queue") { queuedIds() == listOf(b) || queuedIds().isEmpty() }
     }
 }

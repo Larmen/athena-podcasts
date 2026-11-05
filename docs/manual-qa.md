@@ -57,3 +57,12 @@ person with a phone can check.
 - [ ] Airplane mode: browsing and playing still work.
 - [ ] Finish an episode with "Delete download after played" on: it leaves the car list.
 - [ ] With nothing downloaded, the list shows "Nothing downloaded yet".
+
+## Queue
+- [ ] Add two episodes of different podcasts to the queue; the first one finishes and the second starts by itself, also with the screen off. The lock screen shows the second one's title and cover.
+- [ ] Move up / Move down / Remove / Clear queue (with confirmation) behave; buttons are large enough at 200 % font.
+- [ ] Play now on any episode keeps the queue.
+- [ ] Restart the app / reboot: the queue is still there.
+- [ ] Car: the first row is Add to queue; one tap queues, a second unqueues; playback is not interrupted; the car's Queue button lists what is next and jumping works.
+- [ ] Bike with gloves: adding to the queue from the car list is practical (taps, no audio glitch).
+

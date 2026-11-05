@@ -59,6 +59,8 @@ fun EpisodeListScreen(
     onUnsubscribe: () -> Unit,
     onBack: () -> Unit,
     onPlay: (Episode) -> Unit,
+    queuedIds: Set<Long>,
+    onToggleQueue: (Episode) -> Unit,
     onMarkUnplayed: (Episode) -> Unit,
     onMarkPlayed: (Episode) -> Unit,
     onMarkAllPlayed: () -> Unit,
@@ -110,7 +112,7 @@ fun EpisodeListScreen(
             Text(stringResource(if (filter == EpisodeFilter.All) R.string.episodes_empty else R.string.episodes_empty_filtered), Modifier.padding(24.dp), color = muted())
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
-                items(episodes, key = { it.id }) { EpisodeRow(it, feed?.imageUrl, onPlay, onMarkUnplayed, { e -> confirmPlayedId = e.id }, onDownload, onCancelDownload, onDeleteDownload) }
+                items(episodes, key = { it.id }) { EpisodeRow(it, feed?.imageUrl, it.id in queuedIds, onPlay, onToggleQueue, onMarkUnplayed, { e -> confirmPlayedId = e.id }, onDownload, onCancelDownload, onDeleteDownload) }
             }
         }
     }
@@ -163,7 +165,9 @@ fun EpisodeListScreen(
 private fun EpisodeRow(
     episode: Episode,
     feedImageUrl: String?,
+    queued: Boolean,
     onPlay: (Episode) -> Unit,
+    onToggleQueue: (Episode) -> Unit,
     onMarkUnplayed: (Episode) -> Unit,
     onAskMarkPlayed: (Episode) -> Unit,
     onDownload: (Episode) -> Unit,
@@ -209,6 +213,12 @@ private fun EpisodeRow(
             when (episode.downloadState) {
                     DownloadState.Done -> {
                         TextButton(modifier = Modifier.semantics { contentDescription = playLabel }, onClick = { onPlay(episode) }) { Text(stringResource(R.string.episode_play)) }
+                        if (!episode.played) {
+                            val queueLabel = stringResource(if (queued) R.string.queue_remove else R.string.queue_add) + ", " + episode.title
+                            TextButton(modifier = Modifier.semantics { contentDescription = queueLabel }, onClick = { onToggleQueue(episode) }) {
+                                Text(stringResource(if (queued) R.string.queue_remove else R.string.queue_add))
+                            }
+                        }
                         TextButton(modifier = Modifier.semantics { contentDescription = deleteLabel }, onClick = { onDelete(episode) }) { Text(stringResource(R.string.episode_delete_download)) }
                     }
                     DownloadState.Queued, DownloadState.Downloading ->
