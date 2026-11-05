@@ -78,3 +78,14 @@ Order matters. Each task leaves the app building. `[P]` = can run in parallel wi
 - [x] T8.6 (2026-11-05; emulator, 10,000 downloaded episodes: a browse took under the 500 ms limit) Performance test: 10 k-episode feed browse < 500 ms (FR-086)
 - [~] T8.7 (2026-11-05) Checked by the user on the Desktop Head Unit connected to the phone (browse, play, controls worked as intended). Not yet tried on the bike with gloves and handlebar keys; see docs/manual-qa.md. Run on the Desktop Head Unit and then the bike (US7, FR-090); decide the "ride mode" question (spec §10) after the bike test
 - [x] T8.8 (2026-11-05) README (sideloading with Unknown sources, FR-089) and `docs/manual-qa.md` (real car, steering-wheel keys, phone call during playback, no network)
+
+## Phase 9 – Play queue (US8) · FR-100..108
+- [ ] T9.1 `QueueItem` entity + DAO, DB v4, `MIGRATION_3_4`, exported schema, migration test (FR-100)
+- [ ] T9.2 Pure `QueueOrder` (add, remove, move up/down, purge) + JVM tests; `QueueRepository` with the joined, filtered read (FR-100, 101, 105)
+- [ ] T9.3 Service: `QueueSync` mirrors the queue into the player's upcoming items (first 10, small covers); advancing marks the old episode played and removes the new one from the queue; `ProgressSaver` handles transitions and skips (FR-103, 104, 106, 108)
+- [ ] T9.4 Purge hooks: mark played, mark all played, delete download, cleanup, unsubscribe, missing file (FR-105)
+- [ ] T9.5 UI: Add/Remove from queue on episode rows and the player; `Queue (n)` button; `QueueScreen` with Play now / Remove / Move up / Move down / Clear (confirm); strings, labels, 200 % font check (FR-101, 102)
+- [ ] T9.6 Android Auto: the Queue button shows the upcoming items and jumps to a chosen one; the browse list and play-now keep the queue (FR-104, 107)
+- [ ] T9.7 Emulator tests (repository, advance-by-itself, play-now keeps queue, Auto timeline) and full suites, lint
+- [ ] T9.8 Manual: lock screen after an advance, DHU Queue button, the bike; README and `docs/manual-qa.md`
+

@@ -14,7 +14,7 @@ A minimalist Android podcast player that does the essentials: subscribe to RSS f
 **Non-goals (v1)**
 - Streaming of episodes that are not downloaded.
 - Podcast discovery/search directories, recommendations, social features.
-- Playback speed, sleep timer, chapters, queues/playlists, equaliser, Chromecast/Wear (kept in mind, §8); Android Auto is added by US7 (Phase 8).
+- Playback speed, sleep timer, chapters, equaliser, Chromecast/Wear (kept in mind, §8); Android Auto is added by US7 (Phase 8) and a play queue by US8 (Phase 9).
 - Cloud sync, accounts, ads, analytics.
 - Android 15 or older; Play Store distribution (sideload first).
 - Paywalled content that needs an interactive web login (cookie/OAuth), and HTTP Basic-auth feeds (deferred, §8). v1 supports private-URL feeds only.
@@ -47,6 +47,9 @@ As a user I see the show's and episode's artwork in the list, the player and the
 ### US7 – Listen in the car with Android Auto (P2)
 As a motorcyclist riding in thick gloves I want to open Athena Podcasts in Android Auto and see one flat list of my downloaded episodes, newest first, so a single large tap starts the one I want, with play/pause and the skips on the car or mount screen and on my handlebar/helmet controls. No mobile data is needed because only downloaded episodes are offered. *Independent test:* with the Desktop Head Unit (and later on the bike), open the app, tap an episode in the list, play, pause, skip 10 s back and 30 s forward, and see the phone app show the same position afterwards.
 
+### US8 – Queue episodes and listen in a row (P2)
+As a listener I want to line up episodes, e.g. one of show A and then one of show B, so playback moves on by itself without me stopping to fiddle with the phone (on the bike, with gloves). The car's Queue button shows the same lineup. *Independent test:* queue two downloaded episodes from different podcasts, play the first to its end and hear the second start; the car's Queue button lists the second one.
+
 ## 4. Functional requirements
 
 **Subscriptions**
@@ -72,7 +75,7 @@ As a motorcyclist riding in thick gloves I want to open Athena Podcasts in Andro
 - FR-022 Position is saved at least every 5 s while playing and on pause/stop; reopening resumes there. Finishing an episode marks it played and resets position.
 - FR-023 Audio focus: pause on interruptions (calls), resume per platform rules; pause on headphones unplugged ("becoming noisy").
 - FR-024 Only downloaded files are playable; a missing/deleted file shows the Download state again.
-- FR-025 No autoplay of the next episode in v1 (open question §10).
+- FR-025 No automatic choice of what to play next. When an episode ends, playback continues only with the next episode in the queue (FR-100..); with an empty queue it stops, as before.
 
 **Downloads & refresh**
 - FR-030 Periodic feed refresh via WorkManager, default every 6 hours (setting: 1 / 3 / 6 / 12 / 24 h / manual only); also a **Refresh** button on the feed list and on each feed's page (no pull-to-refresh gesture) and on app open.
@@ -111,6 +114,17 @@ As a motorcyclist riding in thick gloves I want to open Athena Podcasts in Andro
 - FR-090 Glove use (motorcycle). Android Auto draws its own screens, so touch-target size is set by the head unit or mount, not by the app. The app therefore does what it controls: a single-level list with the fewest possible taps to playback; only the three transport actions play/pause, back 10 s, forward 30 s on the player screen (no extra custom actions); every control is also reachable by media keys, so handlebar and helmet-intercom buttons (play/pause, next = forward 30 s, previous = back 10 s) work without touching the screen (FR-021b); and no dialogs, confirmations or text prompts appear while connected. Whether the touch targets are big enough on the actual bike screen is checked by the user in T8.7.
 - FR-089 Sideloading: Android Auto lists apps that did not come from Google Play only after the user enables developer mode in Android Auto's settings (tap "Version" 10 times) and turns on "Unknown sources". The README documents this; the app does not need to detect it.
 
+**Queue (US8)**
+- FR-100 The queue is an ordered list of downloaded episodes that are to play after the current one. It is stored in the database, so it survives app restarts and reboots. The episode being played is not in the queue.
+- FR-101 Adding: every downloaded, unplayed episode has an **Add to queue** button (episode lists and player screen), which appends it at the end; while queued the button reads **Remove from queue**. Episodes that are not downloaded, or are played, cannot be queued.
+- FR-102 Queue screen: reached with a **Queue (n)** button on the podcast list (n = how many are queued). Each row shows title and podcast and has plain buttons **Play now**, **Remove**, **Move up**, **Move down**; a **Clear queue** button asks for confirmation. No gestures. An empty queue says "Nothing queued".
+- FR-103 Advancing: when the current episode ends (and is marked played per FR-014) the next queued episode starts by itself from its saved position and leaves the queue. This works with the screen off, and in the car. With an empty queue playback stops.
+- FR-104 Tapping Play on any episode (phone or car list) plays it now and keeps the queue as it is; if that episode was queued it leaves the queue. Starting an episode never clears the queue.
+- FR-105 The queue never holds an episode that cannot play: marking it played, deleting its download, the file disappearing, or unsubscribing from its podcast removes it. Episodes marked played this way are not re-queued by a refresh.
+- FR-106 Position and played tracking are unchanged (FR-014, FR-022): leaving an episode by skipping to another queue entry saves its position; reaching its end marks it played.
+- FR-107 In Android Auto the **Queue** button shows the current episode and the upcoming queue; choosing an entry there jumps to it. The queue is built on the phone only: the car offers no add, remove or reorder (FR-087). The steering-wheel and headset next/previous keys stay forward 30 s / back 10 s (FR-021b).
+- FR-108 The lock screen and notification show the cover and title of the episode now playing, also after an automatic advance.
+
 ## 5. Non-functional requirements
 - NFR-001 Platforms: minSdk 36, target/compile 37. Testing on the Android 17 (API 37) emulator and the user's phone; Android 16 is supported by `minSdk` but not tested.
 - NFR-002 Cold start to interactive list < 500 ms (list comes from the local DB; no network on the critical path). Opening the player and starting playback < 300 ms.
@@ -122,7 +136,7 @@ As a motorcyclist riding in thick gloves I want to open Athena Podcasts in Andro
 - NFR-008 Predictive back and edge-to-edge handled correctly.
 
 ## 6. Data & state
-- Room database: `Feed` (id, url, title, auth reference, last refresh, ETag/Last-Modified, last error), `Episode` (feed id, guid, title, published, duration, enclosure URL/type/size, download state, file path, position, played).
+- Room database: `Feed` (id, url, title, auth reference, last refresh, ETag/Last-Modified, last error), `QueueItem` (episode id, position; cascade-deleted with the episode), `Episode` (feed id, guid, title, published, duration, enclosure URL/type/size, download state, file path, position, played).
 - Credentials: Android Keystore-backed encrypted storage, referenced from `Feed`; feed URLs that contain tokens are treated as secrets (same store; the DB holds a reference).
 - Settings: DataStore Preferences (flat keys, typed `Settings` class, as in the launcher).
 - Files: `getExternalFilesDir("episodes")/<feedId>/<episodeId>.<ext>`; artwork cache under `cacheDir`.
@@ -131,7 +145,7 @@ As a motorcyclist riding in thick gloves I want to open Athena Podcasts in Andro
 Evaluated approach: **do not fork a full app**. AntennaPod (GPL-3.0, Java/Kotlin, XML Views) is the mature reference but its licence conflicts with Constitution §9 (MIT, own code) and its UI stack differs from the Compose launcher. Instead, build thin on proven building blocks (all Apache-2.0 or similar, see plan §4): **Media3** (playback, MediaSession, notification), **WorkManager** (refresh/downloads), **Room**, **OkHttp**, and a small purpose-written RSS parser on `XmlPullParser`. Use AntennaPod only as a behavioural reference (feed edge cases, download policies). A permissively-licensed feed-parsing library may replace our parser if it saves real effort (decide in task T2.1).
 
 ## 8. Out of scope but kept in mind
-HTTP Basic-auth feeds (username + password; host-bound `Authorization` header), autoplay of the next episode, playback speed and skip-silence, sleep timer, queue, chapters/transcripts (Podcasting 2.0), podcast search (iTunes/Podcast Index), voice search in the car ("play X"), Android Automotive OS (cars with Android built in), widgets, per-feed overrides, cloud sync, an Athena Launcher home-screen "now playing" row.
+HTTP Basic-auth feeds (username + password; host-bound `Authorization` header), autoplay of an episode you did not queue, playback speed and skip-silence, sleep timer, queue, chapters/transcripts (Podcasting 2.0), podcast search (iTunes/Podcast Index), voice search in the car ("play X"), Android Automotive OS (cars with Android built in), widgets, per-feed overrides, cloud sync, an Athena Launcher home-screen "now playing" row.
 
 ## 9. Decisions (2026-11-05)
 - Name: **Athena Podcasts**. Application id: `se.anders.athenapodcaster`. Licence: MIT. Sideload first.
@@ -144,7 +158,7 @@ HTTP Basic-auth feeds (username + password; host-bound `Authorization` header), 
 ## 10. Open questions
 - Resolved 2026-11-05: both paid feeds use private URLs with a token. HTTP Basic is deferred.
 - Resolved 2026-11-05: launcher bridge uses a signature-level permission. Android signs every APK anyway; debug builds made on this Mac share `~/.android/debug.keystore`, so sideloaded debug builds of both apps already match with no extra work. For release APKs, sign both with one keystore (plan §3.7).
-- Resolved 2026-11-05: autoplay of the next episode is deferred to a future spec (FR-025 stays: no autoplay in v1).
+- Resolved 2026-11-05: autoplay of the next episode was deferred; replaced by the user-built play queue (US8, FR-100..), still no automatic pick of what to play.
 - Resolved 2026-11-05 (Android Auto): only downloaded episodes, one flat list of all podcasts by release date, newest first, every downloaded episode; the delete-after-played setting alone decides whether finished ones remain (FR-081, FR-013). Use is on a motorcycle in thick gloves (FR-090).
 - Open (Android Auto): an in-app large-button "ride mode" screen for the phone itself, for when the phone is the mount screen and Android Auto is not used. Not in this spec; decide after trying the DHU and the real bike setup. [NEEDS CLARIFICATION]
 - Open (Android Auto): voice search ("play <podcast>") deferred; add via a later spec if wanted.
