@@ -7,8 +7,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Enabled once the Gradle project exists (task T0.3).
-    if: hashFiles('gradlew') != ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
