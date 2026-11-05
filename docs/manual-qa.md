@@ -63,6 +63,6 @@ person with a phone can check.
 - [ ] Move up / Move down / Remove / Clear queue (with confirmation) behave; buttons are large enough at 200 % font.
 - [ ] Play now on any episode keeps the queue.
 - [ ] Restart the app / reboot: the queue is still there.
-- [ ] Car: the first row is Add to queue; one tap queues, a second unqueues; playback is not interrupted; the car's Queue button lists what is next and jumping works.
-- [ ] Bike with gloves: adding to the queue from the car list is practical (taps, no audio glitch).
+- [ ] Car: the Queue button lists what is next and jumping works; there is no way to edit the queue from the car.
+- [ ] Bike with gloves: the Queue button is reachable and readable.
 

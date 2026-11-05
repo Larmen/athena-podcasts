@@ -84,7 +84,7 @@ class PlaybackServiceTest {
         waitFor("paused") { !state().playWhenReady }
         // FR-022: position is saved on pause by the service.
         val paused = state().positionMs
-        waitFor("saved position", 5_000) { runBlocking { container.episodes.get(episode.id)!!.positionMs } in (paused - 1_500)..(paused + 1_500) }
+        waitFor("saved position (paused at $paused, stored ${runBlocking { container.episodes.get(episode.id)!!.positionMs }})", 5_000) { runBlocking { container.episodes.get(episode.id)!!.positionMs } in (paused - 1_500)..(paused + 1_500) }
     }
 
     @Test

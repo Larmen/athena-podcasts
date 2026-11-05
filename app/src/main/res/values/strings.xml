@@ -102,8 +102,6 @@
     <string name="queue_clear">Clear queue</string>
     <string name="queue_clear_title">Clear the queue?</string>
     <string name="queue_clear_body">The queued episodes stay on the phone; only the queue is emptied.</string>
-    <string name="auto_add_to_queue">Add to queue</string>
-    <string name="auto_queued_mark">"Queued · "</string>
     <string name="auto_nothing_downloaded">Nothing downloaded yet</string>
     <string name="auto_not_downloaded">Episode not downloaded</string>
     <string name="player_back_10">Back 10 s</string>

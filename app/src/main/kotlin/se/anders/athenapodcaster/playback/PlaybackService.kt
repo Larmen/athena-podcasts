@@ -41,8 +41,9 @@ import se.anders.athenapodcaster.AthenaPodcasterApplication
 import se.anders.athenapodcaster.MainActivity
 import se.anders.athenapodcaster.R
 import se.anders.athenapodcaster.data.episodes.EpisodeRepository
+import se.anders.athenapodcaster.domain.NowPlaying
 import se.anders.athenapodcaster.domain.Progress
-import se.anders.athenapodcaster.domain.progressFor
+import se.anders.athenapodcaster.domain.ProgressTracker
 
 /** Sent by the notification and lock-screen widget: open the app on the player. */
 const val ACTION_OPEN_PLAYER = "se.anders.athenapodcaster.OPEN_PLAYER"
@@ -95,10 +96,7 @@ class PlaybackService : MediaLibraryService() {
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        library = AutoLibrary(
-            container.episodes, getString(R.string.app_name), getString(R.string.auto_nothing_downloaded),
-            getString(R.string.auto_add_to_queue), getString(R.string.auto_queued_mark),
-        ) { container.queue.observeIds().first().toSet() }
+        library = AutoLibrary(container.episodes, getString(R.string.app_name), getString(R.string.auto_nothing_downloaded))
         val mediaSession = MediaLibrarySession.Builder(this, SkipPlayer(player), LibraryCallback())
             .setSessionActivity(openPlayer).build()
         // Notification and lock screen show 10 s back and 30 s forward (spec FR-021).
@@ -121,7 +119,6 @@ class PlaybackService : MediaLibraryService() {
             container.queue.observe().collect { rows ->
                 queueRows = rows
                 carArt.clear()
-                mediaSession.notifyChildrenChanged(AUTO_QUEUE_ID, AUTO_LIST_LIMIT, null)
                 syncUpcoming()
             }
         }
@@ -251,23 +248,6 @@ class PlaybackService : MediaLibraryService() {
             if (mediaItems.all { it.localConfiguration != null }) {
                 return super.onSetMediaItems(mediaSession, controller, mediaItems, startIndex, startPositionMs)
             }
-            val requested = mediaItems.singleOrNull()?.mediaId
-            if (requested != null && requested.startsWith(QUEUE_TOGGLE_PREFIX)) {
-                // FR-107: a tap in the Add to queue folder edits the queue and leaves playback as it is.
-                return futureOf {
-                    requested.removePrefix(QUEUE_TOGGLE_PREFIX).toLongOrNull()?.let { container.queue.toggle(it) }
-                    session?.notifyChildrenChanged(AUTO_QUEUE_ID, AUTO_LIST_LIMIT, null)
-                    val player = exo
-                    if (player == null || player.mediaItemCount == 0) {
-                        MediaSession.MediaItemsWithStartPosition(emptyList(), C.INDEX_UNSET, C.TIME_UNSET)
-                    } else {
-                        MediaSession.MediaItemsWithStartPosition(
-                            (0 until player.mediaItemCount).map { player.getMediaItemAt(it) },
-                            player.currentMediaItemIndex, player.currentPosition,
-                        )
-                    }
-                }
-            }
             return futureOf {
                 val id = mediaItems.singleOrNull()?.mediaId?.toLongOrNull()
                     ?: throw UnsupportedOperationException("Not an episode")
@@ -326,6 +306,21 @@ class PlaybackService : MediaLibraryService() {
     /** Saves the position every few seconds while playing, and on pause, stop and end (FR-022). */
     private inner class ProgressSaver(private val player: Player) : Player.Listener {
         private val episodes: EpisodeRepository get() = (application as AthenaPodcasterApplication).container.episodes
+        private var lastSave: Job? = null
+
+        /** Saves run one after the other, so an older position can never overwrite a newer one (FR-022). */
+        private fun persist(id: Long, progress: Progress) {
+            val previous = lastSave
+            lastSave = scope.launch { previous?.join(); episodes.saveProgress(id, progress) }
+        }
+
+        private val tracker = ProgressTracker(
+            current = {
+                val id = player.currentMediaItem?.mediaId?.toLongOrNull()
+                id?.let { NowPlaying(it, player.currentPosition, player.duration.takeIf { d -> d != C.TIME_UNSET } ?: 0L) }
+            },
+            persist = { id, progress -> persist(id, progress) },
+        )
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             ticker?.cancel()
@@ -333,16 +328,18 @@ class PlaybackService : MediaLibraryService() {
                 ticker = scope.launch {
                     while (isActive) {
                         delay(SAVE_INTERVAL_MS)
-                        save(ended = false)
+                        tracker.onTick()
                     }
                 }
-            } else {
-                save(ended = false)
             }
+            tracker.onIsPlayingChanged(isPlaying)
         }
 
+        /** Pausing while the player is still buffering leaves "is playing" false, so this is the event that saves it. */
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) = tracker.onPlayWhenReadyChanged(playWhenReady)
+
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState == Player.STATE_ENDED) save(ended = true)
+            if (playbackState == Player.STATE_ENDED) tracker.onEnded()
         }
 
         /** FR-103, FR-106: moving to the next queued episode marks the finished one played; any other jump saves its position. */
@@ -353,7 +350,7 @@ class PlaybackService : MediaLibraryService() {
             if (oldPosition.mediaItem?.mediaId == newPosition.mediaItem?.mediaId) return
             val progress = if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) Progress(0, played = true)
             else Progress(oldPosition.positionMs.coerceAtLeast(0), played = false)
-            scope.launch { episodes.saveProgress(oldId, progress) }
+            persist(oldId, progress)
         }
 
         /** The episode now playing leaves the queue (FR-103, FR-104); a queued episode resumes at its saved position. */
@@ -379,11 +376,5 @@ class PlaybackService : MediaLibraryService() {
             if (gone && player.hasNextMediaItem()) { player.seekToNextMediaItem(); player.prepare(); player.play() }
         }
 
-        private fun save(ended: Boolean) {
-            val id = player.currentMediaItem?.mediaId?.toLongOrNull() ?: return
-            val duration = player.duration.takeIf { it != C.TIME_UNSET } ?: 0L
-            val progress = progressFor(player.currentPosition, duration, ended)
-            scope.launch { episodes.saveProgress(id, progress) }
-        }
     }
 }

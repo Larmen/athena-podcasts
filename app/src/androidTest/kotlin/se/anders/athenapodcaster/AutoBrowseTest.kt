@@ -24,9 +24,7 @@ import se.anders.athenapodcaster.data.db.DownloadState
 import se.anders.athenapodcaster.data.db.Episode
 import se.anders.athenapodcaster.data.db.Feed
 import se.anders.athenapodcaster.playback.AUTO_LIST_LIMIT
-import se.anders.athenapodcaster.playback.AUTO_QUEUE_ID
 import se.anders.athenapodcaster.playback.AUTO_ROOT_ID
-import se.anders.athenapodcaster.playback.queueToggleId
 import se.anders.athenapodcaster.playback.PlaybackService
 
 /** Android Auto library (T8.2..T8.6): a browser talks to the real service, as the car does. */
@@ -94,8 +92,7 @@ class AutoBrowseTest {
         return result
     }
 
-    /** The episode rows, without the Add to queue folder. */
-    private fun episodeRows() = children().filter { it.mediaId != AUTO_QUEUE_ID }
+    private fun episodeRows() = children()
 
     private fun waitFor(what: String, timeoutMs: Long = 15_000, condition: () -> Boolean) {
         val end = System.currentTimeMillis() + timeoutMs
@@ -191,7 +188,7 @@ class AutoBrowseTest {
         val start = System.nanoTime()
         val rows = children()
         val ms = (System.nanoTime() - start) / 1_000_000
-        assertEquals(AUTO_LIST_LIMIT + 1, rows.size) // the folder and 50 episodes
+        assertEquals(AUTO_LIST_LIMIT, rows.size)
         assertNotNull(rows.first().mediaId)
         assertTrue("browsing took $ms ms", ms < 500)
     }
@@ -208,42 +205,13 @@ class AutoBrowseTest {
     private fun queuedIds() = runBlocking { container.queue.observeIds().first() }
 
     @Test
-    fun theFirstRowIsTheAddToQueueFolder() {
+    fun thereIsNoWayToEditTheQueueFromTheCarList() {
         val f = newFeed("Show"); newEpisode(f, "One", far, downloaded = true)
-        val first = children().first()
-        assertEquals(AUTO_QUEUE_ID, first.mediaId)
-        assertTrue(first.mediaMetadata.isBrowsable == true)
-        assertEquals("Add to queue", first.mediaMetadata.title)
-    }
-
-    @Test
-    fun aTapInTheAddToQueueFolderQueuesWithoutInterruptingPlayback() {
-        val f = newFeed("Show")
-        val playing = newEpisode(f, "Playing", far, downloaded = true, position = 120_000)
-        val other = newEpisode(f, "Other", far - 1, downloaded = true)
-        playFromCar(playing)
-        val before = position()
-        assertTrue("started at $before", before in 119_000..130_000)
-
-        instrumentation.runOnMainSync {
-            browser.setMediaItem(MediaItem.Builder().setMediaId(queueToggleId(other)).build())
-            browser.prepare(); browser.play()
-        }
-        waitFor("episode queued") { queuedIds() == listOf(other) }
-        Thread.sleep(1500)
-        val after = position()
-        var playingNow = false; var currentId: String? = null
-        instrumentation.runOnMainSync { playingNow = browser.isPlaying; currentId = browser.currentMediaItem?.mediaId }
-        assertEquals(playing.toString(), currentId)
-        assertTrue("still playing", playingNow)
-        assertTrue("position continued ($before -> $after), no restart", after in (before + 500)..(before + 8_000))
-
-        val inFolder = onMain { browser.getChildren(AUTO_QUEUE_ID, 0, 50, null) }.value!!
-        assertEquals("Queued · Other", inFolder.first { it.mediaId == queueToggleId(other) }.mediaMetadata.title)
-
-        // A second tap takes it out again.
-        instrumentation.runOnMainSync { browser.setMediaItem(MediaItem.Builder().setMediaId(queueToggleId(other)).build()) }
-        waitFor("episode unqueued") { queuedIds().isEmpty() }
+        assertTrue("only playable episode rows", children().all { it.mediaMetadata.isPlayable == true && it.mediaMetadata.isBrowsable != true })
+        // A request that names a queue entry instead of an episode is refused, not turned into an edit.
+        instrumentation.runOnMainSync { browser.setMediaItem(MediaItem.Builder().setMediaId("q:1").build()) }
+        Thread.sleep(800)
+        assertTrue(queuedIds().isEmpty())
     }
 
     @Test
