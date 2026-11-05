@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Many podcast feeds and enclosures are still plain http. Cleartext is allowed at the platform level, and the app
+  gates it: adding an http feed needs an explicit confirmation, and a private (token) feed must be https
+  (NFR-004, constitution §4). TLS errors are never ignored: no trust overrides anywhere.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

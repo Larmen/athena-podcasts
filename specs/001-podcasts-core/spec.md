@@ -1,0 +1,133 @@
+# Spec 001 – Podcasts Core
+
+Status: Draft · Owner: Anders · Date: 2026-11-05
+
+## 1. Summary
+A minimalist Android podcast player that does the essentials: subscribe to RSS feeds (including two paid/private feeds), **automatically download** new episodes in the background, and play the downloaded files with play/pause, **back 10 s** and **forward 30 s**. No streaming. Album art is step two. The look (monochrome, typeface, text size, light/dark) matches Athena Launcher and follows its settings where possible.
+
+## 2. Goals / Non-goals
+**Goals**
+- Reliable offline listening: new episodes are on the phone before I need them.
+- Support the user's paid feeds (private feed URLs with a token).
+- Look and feel identical in spirit to Athena Launcher; appearance configured in one place.
+
+**Non-goals (v1)**
+- Streaming of episodes that are not downloaded.
+- Podcast discovery/search directories, recommendations, social features.
+- Playback speed, sleep timer, chapters, queues/playlists, equaliser, Chromecast/Auto/Wear (kept in mind, §8).
+- Cloud sync, accounts, ads, analytics.
+- Android 15 or older; Play Store distribution (sideload first).
+- Paywalled content that needs an interactive web login (cookie/OAuth), and HTTP Basic-auth feeds (deferred, §8). v1 supports private-URL feeds only.
+
+## 3. User stories
+
+### US1 – Subscribe to feeds (P1)
+As a user I add a podcast by pasting an RSS URL (or importing OPML) and see its episodes.
+- Acceptance: valid feed → appears in the list with title and episodes; invalid/unreachable URL → clear error, nothing saved.
+
+### US2 – Play downloaded episodes (P1)
+As a user I open an episode and play/pause, jump back 10 s or forward 30 s, and it resumes where I left off.
+- Acceptance: controls work from the app, lock screen, notification, headset and Bluetooth; audio continues with the screen off; position is remembered per episode.
+
+### US3 – Automatic downloads (P1)
+As a user, new episodes of my subscriptions are downloaded in the background without opening the app.
+- Acceptance: with defaults (Wi-Fi only, charging not required), a new episode published while the app is closed is downloaded before I next open it; I can also download or delete an episode by hand.
+
+### US4 – Paid/private feeds (P1)
+As a user I can add my two paid feeds (private URLs with a token inside) so they behave exactly like public ones.
+- Acceptance: a private feed URL can be pasted and added; refresh and downloads work; the URL is never shown in full or logged (Constitution §4).
+
+### US5 – Appearance like the launcher (P2)
+As a user the app looks like Athena Launcher and picks up its theme, typeface and text size, so I configure them once.
+- Acceptance: change typeface in the launcher → the app shows it next time it is opened (or live); with the launcher absent, local settings apply.
+
+### US6 – Album art (P2, step two)
+As a user I see the show's and episode's artwork in the list, the player and the notification/lock screen.
+
+## 4. Functional requirements
+
+**Subscriptions**
+- FR-001 Add a feed by URL. The app fetches and validates it (RSS 2.0 with `<enclosure>`; iTunes and Podcasting 2.0 namespaces read where useful, not required). Nothing is saved if parsing fails.
+- FR-002 Private feeds: the feed URL itself carries the secret token. Feed URLs are stored in the encrypted secret store and shown masked (host only) with an explicit reveal. No credentials are sent as headers in v1, and the feed URL is never passed to any host other than itself (enclosure URLs from the feed are fetched as given).
+- FR-003 Unsubscribe: removes the feed; asks whether to also delete its downloaded files.
+- FR-004 Import and export subscriptions as OPML via the system file picker. Private feeds (URLs with tokens) are excluded from export unless the user explicitly includes them.
+- FR-005 Feed list screen: title, unplayed/undownloaded counts as plain text, tap opens the feed. Calm: no badges.
+
+**Episodes**
+- FR-010 Episode list per feed, newest first: title, date, duration (if known), state (not downloaded / downloading n % / downloaded / played).
+- FR-011 Episodes are identified by `<guid>` (fallback: enclosure URL). Refresh never creates duplicates and never loses position or download state.
+- FR-012 Per episode: Download, Delete download, Mark played/unplayed. Tapping an episode that is not downloaded offers Download; it never streams.
+- FR-014 Played tracking. Every episode is either unplayed or played. **Auto-complete:** an episode becomes played when playback reaches its end (or within the last 15 s, so outros do not matter), and its position resets. **Manual:** a Played/Unplayed toggle button in the player and in each episode row (plain buttons, no long-press or swipe) sets the state either way. **Mark played** asks for confirmation first: the dialog says the downloaded file will be deleted, and confirming marks the episode played and deletes the file (a queued or running download is cancelled instead); the episode stays in the list and can be downloaded again. **Mark unplayed** needs no confirmation and does not bring the file back. Marking played also clears the saved position. **Mark all as played** (a button on each podcast's episode page, with a confirmation dialog that states the count and that downloaded files are deleted and downloads in progress cancelled) does the same for every unplayed episode of that podcast; episodes already played are left as they are. New episodes that appear later are unplayed and download as usual. Played episodes are shown muted with the word "Played"; unplayed episodes show "New" until opened and then their remaining time. The episode list has a filter button that steps through **All → Downloaded only → Unplayed** and back to All ("Showing: all episodes", "Showing: downloaded only", "Showing: unplayed only"); "downloaded" means the file is on the phone. The state survives refresh, re-download and app updates, and is never changed by a refresh. Marking an episode played also stops it from being auto-downloaded.
+- FR-013 Played episodes: setting "Delete download after played" (default off). When on, deletion happens after the episode ends and after a short grace period.
+
+**Playback**
+- FR-020 Player screen: title, show, elapsed/remaining, a progress bar (not draggable in v1), **Play/Pause**, **Back 10 s**, **Forward 30 s**, all plain icon buttons (a circular arrow showing 10 or 30, play and pause symbols, each with a screen-reader label; no gestures). Skip amounts are fixed in v1 (constants, easy to change later). Skips clamp to 0 and to the episode end.
+- FR-021 Playback runs in a Media3 `MediaSessionService` (foreground, media notification) so it continues with the screen off and is controllable from the notification, lock screen, headset buttons and Bluetooth (play/pause, ±skip mapped to 10 s back / 30 s forward).
+- FR-021a Tapping the media notification or the lock-screen Now Playing widget opens the app on the player screen (on the lock screen the system asks to unlock first).
+- FR-021b Headset, Bluetooth and car media keys: play, pause, play/pause and the headset hook control the player; **next** and **fast forward** skip 30 s forward, **previous** and **rewind** skip 10 s back (there is only one item, so next/previous would otherwise do nothing).
+- FR-021c Now-playing bar: while an episode is loaded and not finished, a strip at the bottom of the podcast list and episode screens shows its title and show with the back 10 s, play/pause and forward 30 s icon buttons. Tapping the title opens the player. It is hidden on the player screen and when nothing is loaded.
+- FR-022 Position is saved at least every 5 s while playing and on pause/stop; reopening resumes there. Finishing an episode marks it played and resets position.
+- FR-023 Audio focus: pause on interruptions (calls), resume per platform rules; pause on headphones unplugged ("becoming noisy").
+- FR-024 Only downloaded files are playable; a missing/deleted file shows the Download state again.
+- FR-025 No autoplay of the next episode in v1 (open question §10).
+
+**Downloads & refresh**
+- FR-030 Periodic feed refresh via WorkManager, default every 6 hours (setting: 1 / 3 / 6 / 12 / 24 h / manual only); also a **Refresh** button on the feed list and on each feed's page (no pull-to-refresh gesture) and on app open.
+- FR-031 New episodes are enqueued for download automatically, as long as they are among the latest **N** per feed (setting, default 1 = only the latest episode, range 0–10; 0 = manual only). On first subscribe only the latest N are fetched, never the whole back catalogue.
+- FR-032 Downloads: resumable (HTTP Range), run as WorkManager expedited/long-running work with a progress notification only while a download is running; retry with back-off; survive process death and reboot.
+- FR-033 Network policy (setting): Wi-Fi only (default) or any network. Optional "only while charging" (default off). A manual download ignores the charging rule and, after a confirmation, may use mobile data.
+- FR-034 Storage: files in app-specific external storage (removed on uninstall, no storage permission). Setting "Keep at most X episodes per feed" (default: keep all downloaded and unplayed; delete played per FR-013). Low-storage guard: do not start downloads below a free-space threshold, and tell the user once.
+- FR-035 Feed refresh uses conditional requests (ETag / Last-Modified) to save data.
+- FR-036 Failures are visible but quiet. A refresh that fails on the connection itself (offline, name lookup, timeout) is tried once more after a moment; if it still fails, the scheduled background refresh leaves no message (the system may simply have blocked background network access, and the job retries later), while a refresh the user asked for, or the one at app open, shows the specific reason ("could not find the server", "took too long", "could not make a secure connection", or the general "could not reach the server"). Two refreshes of the same feed never run at once, so an old failure cannot overwrite a newer success. The rest of FR-036: a per-feed "last refresh failed: reason" line; no notification for failures except a single notification when a paid feed returns 401/403 ("Check credentials for X").
+
+**Album art (step two, P2)**
+- FR-040 Show feed artwork in the feed list and player; episode artwork where the feed provides it, else the feed's. Artwork is fetched and cached with the episode/feed and works offline afterwards.
+- FR-041 Media notification and lock screen show the artwork (MediaSession metadata).
+- FR-042 Art style (setting, default Grayscale): **Original** or **Grayscale** (colour removed, contrast reduced), mirroring the launcher's icon style. Follows light/dark live.
+- FR-043 Artwork is downscaled and disk-cached with a size cap; no art = no placeholder noise (a plain text row).
+
+**Appearance & settings (shared with Athena Launcher)**
+- FR-060 Style: monochrome. Light = black on white; dark = white on pure black; custom colour schemes (no dynamic colour); system-bar icons and window background match so nothing flashes on start. Same tokens as the launcher's `Theme.kt`.
+- FR-061 Appearance settings: theme (follow system / light / dark), typeface (System, Condensed, Serif, Monospace, Cursive, Casual, plus bundled VT323, IBM Plex Mono, Space Mono, JetBrains Mono, Inter, Atkinson Hyperlegible), text size 80–140 % in 10 % steps. Same names, ranges and defaults as the launcher so values map one-to-one.
+- FR-062 **Follow launcher** (setting, default on when the launcher is installed): theme, typeface and text size are read from Athena Launcher. The app reads them through a read-only bridge exposed by the launcher (plan §3.7), at start-up and while running (observer); if the launcher is missing, not updated, or denies access, the app silently uses its own local values. With "Follow launcher" off, local values apply and are editable here.
+- FR-063 One-off import of the launcher's settings export JSON (`app` = "athena-launcher") as a fallback/alternative to the live bridge: only `themeMode`, `typeface`, `textScalePercent` are read; everything else is ignored.
+- FR-064 Local settings screen with sections: Appearance (follow launcher, theme, typeface, text size, art style), Downloads (episodes per feed, network, charging, delete after played, keep-at-most), Refresh (interval), About (Open-source licences).
+- FR-065 Export/import of the app's own settings JSON (`app` = "athena-podcaster", `version`), same rules as the launcher's FR-061 (unknown keys ignored, bad values clamped, other apps' files rejected). Credentials are never in this file.
+- FR-066 Licences screen as in the launcher (FR-062): Athena Podcasts (MIT), bundled fonts (OFL), AndroidX/Media3/OkHttp etc. (Apache-2.0), each expandable to the full text, shipped in the app.
+
+## 5. Non-functional requirements
+- NFR-001 Platforms: minSdk 36, target/compile 37. Testing on the Android 17 (API 37) emulator and the user's phone; Android 16 is supported by `minSdk` but not tested.
+- NFR-002 Cold start to interactive list < 500 ms (list comes from the local DB; no network on the critical path). Opening the player and starting playback < 300 ms.
+- NFR-003 Permissions: `INTERNET`, `FOREGROUND_SERVICE` (+ `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, and `FOREGROUND_SERVICE_DATA_SYNC` if downloads need it), `POST_NOTIFICATIONS` (requested just in time, when the first download or playback notification is needed). No storage, contacts, location or microphone permissions. No analytics/crash SDKs.
+- NFR-004 Network security: HTTPS preferred; cleartext HTTP allowed per feed only after an explicit confirmation (many small feeds still use it); a private (token) feed must use HTTPS; TLS errors are never silently ignored.
+- NFR-005 Accessibility: TalkBack labels on every control, touch targets ≥ 48 dp (the three transport buttons larger), font scaling to 200 % without clipping, sufficient contrast.
+- NFR-006 Battery: no wake locks outside Media3 playback/WorkManager; no polling; periodic work respects Doze and battery-saver.
+- NFR-007 Robustness: malformed feeds, huge feeds (10 k episodes), missing durations, redirects, gzip, odd encodings and non-audio enclosures must not crash; tests cover them.
+- NFR-008 Predictive back and edge-to-edge handled correctly.
+
+## 6. Data & state
+- Room database: `Feed` (id, url, title, auth reference, last refresh, ETag/Last-Modified, last error), `Episode` (feed id, guid, title, published, duration, enclosure URL/type/size, download state, file path, position, played).
+- Credentials: Android Keystore-backed encrypted storage, referenced from `Feed`; feed URLs that contain tokens are treated as secrets (same store; the DB holds a reference).
+- Settings: DataStore Preferences (flat keys, typed `Settings` class, as in the launcher).
+- Files: `getExternalFilesDir("episodes")/<feedId>/<episodeId>.<ext>`; artwork cache under `cacheDir`.
+
+## 7. Open-source basis – recommendation
+Evaluated approach: **do not fork a full app**. AntennaPod (GPL-3.0, Java/Kotlin, XML Views) is the mature reference but its licence conflicts with Constitution §9 (MIT, own code) and its UI stack differs from the Compose launcher. Instead, build thin on proven building blocks (all Apache-2.0 or similar, see plan §4): **Media3** (playback, MediaSession, notification), **WorkManager** (refresh/downloads), **Room**, **OkHttp**, and a small purpose-written RSS parser on `XmlPullParser`. Use AntennaPod only as a behavioural reference (feed edge cases, download policies). A permissively-licensed feed-parsing library may replace our parser if it saves real effort (decide in task T2.1).
+
+## 8. Out of scope but kept in mind
+HTTP Basic-auth feeds (username + password; host-bound `Authorization` header), autoplay of the next episode, playback speed and skip-silence, sleep timer, queue, chapters/transcripts (Podcasting 2.0), podcast search (iTunes/Podcast Index), Android Auto, widgets, per-feed overrides, cloud sync, an Athena Launcher home-screen "now playing" row.
+
+## 9. Decisions (2026-11-05)
+- Name: **Athena Podcasts**. Application id: `se.anders.athenapodcaster`. Licence: MIT. Sideload first.
+- Platform: native Android (Kotlin + Compose), same toolchain and targets as Athena Launcher, so theme, fonts and settings can be shared. (Flutter was considered because of the other projects on this machine, but it would make sharing launcher settings and fonts harder.)
+- Fresh implementation on Media3 + WorkManager; no fork (§7).
+- Streaming: not supported, by design.
+- Skip amounts: 10 s back, 30 s forward, fixed.
+- Art style default: Grayscale (fits the calm aesthetic); Original is one tap away.
+
+## 10. Open questions
+- Resolved 2026-11-05: both paid feeds use private URLs with a token. HTTP Basic is deferred.
+- Resolved 2026-11-05: launcher bridge uses a signature-level permission. Android signs every APK anyway; debug builds made on this Mac share `~/.android/debug.keystore`, so sideloaded debug builds of both apps already match with no extra work. For release APKs, sign both with one keystore (plan §3.7).
+- Resolved 2026-11-05: autoplay of the next episode is deferred to a future spec (FR-025 stays: no autoplay in v1).
+- Resolved 2026-11-05: auto-download default is 1 (latest episode only).
+- Resolved 2026-11-05: "Follow launcher" includes the text-size percentage, applied on top of the system font scale (they multiply), exactly as in the launcher.
