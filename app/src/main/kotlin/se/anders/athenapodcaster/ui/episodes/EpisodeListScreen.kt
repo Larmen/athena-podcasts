@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -209,7 +210,10 @@ private fun EpisodeRow(
             }
         }
         // Everything is a visible button on the episode itself (constitution §2b), under the picture and text so they never wrap.
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        // The buttons line up with the text above (title, date, state), not with the picture, so each episode reads as one group.
+        // A TextButton insets its label by 12 dp, which is taken back so the first label starts exactly where the title does.
+        val textStart = if (hasArt(art)) 72.dp else 0.dp
+        FlowRow(Modifier.padding(start = textStart).offset(x = (-12).dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             when (episode.downloadState) {
                     DownloadState.Done -> {
                         TextButton(modifier = Modifier.semantics { contentDescription = playLabel }, onClick = { onPlay(episode) }) { Text(stringResource(R.string.episode_play)) }

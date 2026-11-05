@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -90,7 +91,7 @@ private fun QueueRow(
     Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium)
         Text(meta, style = MaterialTheme.typography.bodyMedium, color = muted())
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        FlowRow(Modifier.offset(x = (-12).dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) { // first label starts where the title does
             val play = stringResource(R.string.queue_play_now) + ", " + title
             val remove = stringResource(R.string.queue_remove) + ", " + title
             val up = stringResource(R.string.queue_move_up) + ", " + title
