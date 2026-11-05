@@ -85,7 +85,7 @@ Order matters. Each task leaves the app building. `[P]` = can run in parallel wi
 - [ ] T9.3 Service: `QueueSync` mirrors the queue into the player's upcoming items (first 10, small covers); advancing marks the old episode played and removes the new one from the queue; `ProgressSaver` handles transitions and skips (FR-103, 104, 106, 108)
 - [ ] T9.4 Purge hooks: mark played, mark all played, delete download, cleanup, unsubscribe, missing file (FR-105)
 - [ ] T9.5 UI: Add/Remove from queue on episode rows and the player; `Queue (n)` button; `QueueScreen` with Play now / Remove / Move up / Move down / Clear (confirm); strings, labels, 200 % font check (FR-101, 102)
-- [ ] T9.6 Android Auto: the Queue button shows the upcoming items and jumps to a chosen one; the browse list and play-now keep the queue (FR-104, 107)
+- [ ] T9.6 Android Auto: `Add to queue` folder with toggle-on-tap (`q:<id>`, "Queued · " mark, no playback restart); the Queue button shows the upcoming items and jumps to a chosen one; the browse list and play-now keep the queue; check on the DHU, mainly that audio does not glitch (FR-104, 107)
 - [ ] T9.7 Emulator tests (repository, advance-by-itself, play-now keeps queue, Auto timeline) and full suites, lint
 - [ ] T9.8 Manual: lock screen after an advance, DHU Queue button, the bike; README and `docs/manual-qa.md`
 
