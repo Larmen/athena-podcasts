@@ -46,3 +46,14 @@ person with a phone can check.
 - [ ] Export settings, change one, import the file: confirm dialog, setting restored.
 - [ ] Export OPML (private feeds excluded unless ticked); import the OPML on a clean install adds the public feeds.
 - [ ] "Import from a launcher settings file" reads a launcher export.
+
+## Android Auto (on the bike / in a car)
+- [ ] Unknown sources is on in Android Auto's developer settings; Athena Podcasts appears in the app list.
+- [ ] The list shows downloaded episodes of all podcasts, newest first; nothing that is not downloaded.
+- [ ] With gloves on: every row and the play/pause, back 10 s and forward 30 s controls can be hit reliably on the mount screen. Note what is too small (FR-090).
+- [ ] Tap an episode: it starts where it stopped last time; pausing in the car shows the same position in the phone app.
+- [ ] Handlebar / helmet intercom buttons: play/pause, next (forward 30 s), previous (back 10 s).
+- [ ] An incoming call pauses playback and it resumes afterwards.
+- [ ] Airplane mode: browsing and playing still work.
+- [ ] Finish an episode with "Delete download after played" on: it leaves the car list.
+- [ ] With nothing downloaded, the list shows "Nothing downloaded yet".

@@ -79,16 +79,7 @@ class PlayerController(private val context: Context) {
             val c = controller ?: return@launch
             val id = episode.id.toString()
             if (c.currentMediaItem?.mediaId != id || c.playbackState == Player.STATE_ENDED) {
-                val item = MediaItem.Builder()
-                    .setMediaId(id)
-                    .setUri(Uri.fromFile(file))
-                    .setMediaMetadata(
-                        MediaMetadata.Builder().setTitle(episode.title).setArtist(showTitle)
-                            // FR-041: the notification and lock screen show the cover; bytes work across processes.
-                            .apply { if (artwork != null) setArtworkData(artwork, MediaMetadata.PICTURE_TYPE_FRONT_COVER) }
-                            .build(),
-                    )
-                    .build()
+                val item = episodeMediaItem(episode.id, episode.title, showTitle, file, artwork)
                 c.setMediaItem(item, episode.positionMs)
                 c.prepare()
             }

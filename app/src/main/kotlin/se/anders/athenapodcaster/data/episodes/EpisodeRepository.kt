@@ -5,14 +5,22 @@ import kotlinx.coroutines.flow.Flow
 import se.anders.athenapodcaster.data.db.AppDatabase
 import se.anders.athenapodcaster.data.db.DownloadState
 import se.anders.athenapodcaster.data.db.Episode
+import se.anders.athenapodcaster.data.db.EpisodeWithFeed
+import se.anders.athenapodcaster.playback.CarEpisodes
 import se.anders.athenapodcaster.domain.Progress
 
 /** Per-episode state: played, position, downloaded file (FR-012, FR-014, FR-022, FR-024). */
-class EpisodeRepository(db: AppDatabase) {
+class EpisodeRepository(db: AppDatabase) : CarEpisodes {
     private val dao = db.episodeDao()
 
     fun observe(id: Long): Flow<Episode?> = dao.observe(id)
     suspend fun get(id: Long): Episode? = dao.get(id)
+
+    override suspend fun downloaded(limit: Int): List<EpisodeWithFeed> = dao.downloadedWithFeed(limit)
+    override suspend fun find(id: Long): EpisodeWithFeed? = dao.withFeed(id)
+
+    /** Ids of the downloaded episodes the car list shows; emits again when the list may have changed (FR-081). */
+    fun observeDownloadedIds(limit: Int): Flow<List<Long>> = dao.observeDownloadedIds(limit)
 
     suspend fun setPlayed(id: Long, played: Boolean) {
         if (played) dao.markPlayed(id) else dao.markUnplayed(id)

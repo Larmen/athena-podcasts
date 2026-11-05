@@ -11,8 +11,22 @@ import androidx.media3.datasource.FileDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.CommandButton
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaConstants
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionError
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import com.google.common.util.concurrent.SettableFuture
+import se.anders.athenapodcaster.data.art.ArtworkStore
+import android.os.Bundle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,6 +47,7 @@ const val ACTION_OPEN_PLAYER = "se.anders.athenapodcaster.OPEN_PLAYER"
 const val SEEK_BACK_MS = 10_000L
 const val SEEK_FORWARD_MS = 30_000L
 private const val SAVE_INTERVAL_MS = 5_000L
+private const val LIST_ART_PX = 160
 
 /**
  * Plays downloaded episodes (FR-020..024). A foreground media service, so audio continues with the screen off
@@ -42,8 +57,11 @@ private const val SAVE_INTERVAL_MS = 5_000L
  * - Progress is saved here, not in the UI, so it keeps working when the app screen is closed (FR-022).
  */
 @OptIn(UnstableApi::class) // FileDataSource / DefaultMediaSourceFactory: Media3's documented way to restrict sources
-class PlaybackService : MediaSessionService() {
-    private var session: MediaSession? = null
+class PlaybackService : MediaLibraryService() {
+    private var session: MediaLibrarySession? = null
+    private val container get() = (application as AthenaPodcasterApplication).container
+    private lateinit var library: AutoLibrary
+    private val carArt = HashMap<String, ByteArray?>()
     private lateinit var scope: CoroutineScope
     private var ticker: Job? = null
 
@@ -69,7 +87,9 @@ class PlaybackService : MediaSessionService() {
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val mediaSession = MediaSession.Builder(this, SkipPlayer(player)).setSessionActivity(openPlayer).build()
+        library = AutoLibrary(container.episodes, getString(R.string.app_name), getString(R.string.auto_nothing_downloaded))
+        val mediaSession = MediaLibrarySession.Builder(this, SkipPlayer(player), LibraryCallback())
+            .setSessionActivity(openPlayer).build()
         // Notification and lock screen show 10 s back and 30 s forward (spec FR-021).
         mediaSession.setMediaButtonPreferences(
             listOf(
@@ -85,9 +105,121 @@ class PlaybackService : MediaSessionService() {
         )
         session = mediaSession
         player.addListener(ProgressSaver(player))
+        // FR-081: an open car list follows downloads finishing and files being deleted.
+        scope.launch {
+            container.episodes.observeDownloadedIds(AUTO_LIST_LIMIT).distinctUntilChanged().collect {
+                carArt.clear()
+                mediaSession.notifyChildrenChanged(AUTO_ROOT_ID, AUTO_LIST_LIMIT, null)
+            }
+        }
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
+
+    /** Runs [block] on the service scope and hands its result (or failure) to Media3 as a future. */
+    private fun <T> futureOf(block: suspend () -> T): ListenableFuture<T> {
+        val result = SettableFuture.create<T>()
+        scope.launch {
+            try { result.set(block()) } catch (e: kotlin.coroutines.cancellation.CancellationException) { result.cancel(false); throw e } catch (e: Exception) { result.setException(e) }
+        }
+        return result
+    }
+
+    /** Small cover for a list row (FR-085): local files only, cached per picture until the list changes. */
+    private suspend fun listArt(row: CarRow): ByteArray? {
+        val key = row.artUrls.joinToString("|")
+        if (key.isBlank()) return null
+        return carArt.getOrPut(key) { container.artwork.mediaBytes(row.artUrls, container.settings.settings.first().artStyle, LIST_ART_PX) }
+    }
+
+    private suspend fun itemOf(row: CarRow): MediaItem = MediaItem.Builder()
+        .setMediaId(row.id)
+        .setMediaMetadata(
+            MediaMetadata.Builder()
+                .setTitle(row.title)
+                .setSubtitle(row.subtitle)
+                .setArtist(row.subtitle)
+                .setIsBrowsable(row.browsable)
+                .setIsPlayable(row.playable)
+                .apply {
+                    row.durationMs?.let(::setDurationMs)
+                    listArt(row)?.let { setArtworkData(it, MediaMetadata.PICTURE_TYPE_FRONT_COVER) }
+                    if (row.browsable) setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+                    else if (row.playable) setMediaType(MediaMetadata.MEDIA_TYPE_PODCAST_EPISODE)
+                }
+                .build(),
+        )
+        .build()
+
+    /** FR-080..088: the browse tree for Android Auto, and playback requests that name an episode by id only. */
+    private inner class LibraryCallback : MediaLibrarySession.Callback {
+        override fun onGetLibraryRoot(
+            session: MediaLibrarySession, browser: MediaSession.ControllerInfo, params: MediaLibraryService.LibraryParams?,
+        ): ListenableFuture<LibraryResult<MediaItem>> {
+            if (!mayBrowseLibrary(browser.packageName, packageName, browser.isTrusted)) {
+                return Futures.immediateFuture(LibraryResult.ofError(SessionError.ERROR_PERMISSION_DENIED))
+            }
+            // Ask the car for a plain list (FR-090: one level, big rows).
+            val extras = Bundle().apply {
+                putInt(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_PLAYABLE, MediaConstants.EXTRAS_VALUE_CONTENT_STYLE_LIST_ITEM)
+            }
+            val rootParams = MediaLibraryService.LibraryParams.Builder().setExtras(extras).build()
+            return futureOf { LibraryResult.ofItem(itemOf(library.root()), rootParams) }
+        }
+
+        override fun onGetChildren(
+            session: MediaLibrarySession, browser: MediaSession.ControllerInfo, parentId: String,
+            page: Int, pageSize: Int, params: MediaLibraryService.LibraryParams?,
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+            if (!mayBrowseLibrary(browser.packageName, packageName, browser.isTrusted)) {
+                return Futures.immediateFuture(LibraryResult.ofError(SessionError.ERROR_PERMISSION_DENIED))
+            }
+            return futureOf {
+                val rows = library.children(parentId, page, pageSize)
+                    ?: return@futureOf LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
+                LibraryResult.ofItemList(ImmutableList.copyOf(rows.map { itemOf(it) }), params)
+            }
+        }
+
+        override fun onGetItem(
+            session: MediaLibrarySession, browser: MediaSession.ControllerInfo, mediaId: String,
+        ): ListenableFuture<LibraryResult<MediaItem>> {
+            if (!mayBrowseLibrary(browser.packageName, packageName, browser.isTrusted)) {
+                return Futures.immediateFuture(LibraryResult.ofError(SessionError.ERROR_PERMISSION_DENIED))
+            }
+            return futureOf {
+                val row = library.item(mediaId) ?: return@futureOf LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
+                LibraryResult.ofItem(itemOf(row), null)
+            }
+        }
+
+        /**
+         * Items that already carry a file (the phone's own player) pass through. Items that name an episode only by id
+         * (Android Auto) are resolved to the downloaded file and the saved position; a missing file is refused and
+         * never turns into a network fetch (FR-024, FR-083).
+         */
+        override fun onSetMediaItems(
+            mediaSession: MediaSession, controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long,
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            if (mediaItems.all { it.localConfiguration != null }) {
+                return super.onSetMediaItems(mediaSession, controller, mediaItems, startIndex, startPositionMs)
+            }
+            return futureOf {
+                val id = mediaItems.singleOrNull()?.mediaId?.toLongOrNull()
+                    ?: throw UnsupportedOperationException("Not an episode")
+                val found = container.episodes.find(id) ?: throw UnsupportedOperationException("Unknown episode")
+                val file = container.episodes.playableFile(found.episode)
+                    ?: throw UnsupportedOperationException(getString(R.string.auto_not_downloaded))
+                val art = container.artwork.mediaBytes(
+                    listOf(found.episode.imageUrl, found.feedImageUrl), container.settings.settings.first().artStyle,
+                )
+                val item = episodeMediaItem(id, found.episode.title, found.feedTitle, file, art)
+                val start = if (startPositionMs == C.TIME_UNSET) found.episode.positionMs else startPositionMs
+                MediaSession.MediaItemsWithStartPosition(listOf(item), 0, start)
+            }
+        }
+    }
 
     /** Swiping the app away while paused ends the service; while playing it keeps going. */
     override fun onTaskRemoved(rootIntent: Intent?) {

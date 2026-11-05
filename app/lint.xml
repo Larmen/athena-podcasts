@@ -4,4 +4,6 @@
     <issue id="UnsafeOptInUsageError">
         <option name="opt-in" value="androidx.media3.common.util.UnstableApi" />
     </issue>
+    <!-- Voice search in the car ("play X") is out of scope (spec §8, FR-080); the filter would promise what is not there. -->
+    <issue id="MissingIntentFilterForMediaSearch" severity="ignore" />
 </lint>

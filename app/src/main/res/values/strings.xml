@@ -88,6 +88,8 @@
     <string name="episode_queued">Queued</string>
     <string name="episode_failed">Download failed</string>
     <string name="episode_not_downloaded">Not downloaded</string>
+    <string name="auto_nothing_downloaded">Nothing downloaded yet</string>
+    <string name="auto_not_downloaded">Episode not downloaded</string>
     <string name="player_back_10">Back 10 s</string>
     <string name="player_forward_30">Forward 30 s</string>
     <string name="player_play">Play</string>

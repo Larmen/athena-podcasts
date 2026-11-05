@@ -113,9 +113,9 @@ class ArtworkStore(context: Context, client: OkHttpClient = OkHttpClient()) {
      * Cover art for the notification and lock screen (FR-041): the first stored of [urls], scaled to at most 512 px,
      * in the chosen [style], as JPEG bytes. Null if there is none.
      */
-    suspend fun mediaBytes(urls: List<String?>, style: ArtStyle): ByteArray? = withContext(Dispatchers.IO) {
+    suspend fun mediaBytes(urls: List<String?>, style: ArtStyle, maxPx: Int = MEDIA_ART_PX): ByteArray? = withContext(Dispatchers.IO) {
         val file = urls.firstNotNullOfOrNull { url -> url?.let(::fileFor)?.takeIf { it.isFile } } ?: return@withContext null
-        var bitmap = decode(file, MEDIA_ART_PX) ?: return@withContext null
+        var bitmap = decode(file, maxPx) ?: return@withContext null
         if (style == ArtStyle.Grayscale) bitmap = grayscale(bitmap)
         ByteArrayOutputStream().use { out ->
             bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)

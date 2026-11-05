@@ -16,6 +16,13 @@ data class FeedSummary(
     val downloadedCount: Int,
 )
 
+/** An episode with the show it belongs to, for lists that mix podcasts (Android Auto, FR-081). */
+data class EpisodeWithFeed(
+    @Embedded val episode: Episode,
+    val feedTitle: String,
+    val feedImageUrl: String?,
+)
+
 @Dao
 interface FeedDao {
     @Query(
@@ -63,6 +70,25 @@ interface EpisodeDao {
 
     @Query("SELECT * FROM episodes WHERE id = :id")
     suspend fun get(id: Long): Episode?
+
+    @Query(
+        """
+        SELECT e.*, f.title AS feedTitle, f.imageUrl AS feedImageUrl FROM episodes e JOIN feeds f ON f.id = e.feedId
+        WHERE e.downloadState = 'Done' ORDER BY e.publishedAt DESC, e.id DESC LIMIT :limit
+        """,
+    )
+    suspend fun downloadedWithFeed(limit: Int): List<EpisodeWithFeed>
+
+    @Query(
+        """
+        SELECT e.*, f.title AS feedTitle, f.imageUrl AS feedImageUrl FROM episodes e JOIN feeds f ON f.id = e.feedId
+        WHERE e.id = :id
+        """,
+    )
+    suspend fun withFeed(id: Long): EpisodeWithFeed?
+
+    @Query("SELECT id FROM episodes WHERE downloadState = 'Done' ORDER BY publishedAt DESC, id DESC LIMIT :limit")
+    fun observeDownloadedIds(limit: Int): Flow<List<Long>>
 
     @Query("UPDATE episodes SET played = 1, positionMs = 0 WHERE id = :id")
     suspend fun markPlayed(id: Long)

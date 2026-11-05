@@ -26,6 +26,11 @@ keytool -genkeypair -v -keystore athena-release.jks -alias athena -keyalg RSA -k
 
 Keep the keystore and its passwords out of the repository (`*.jks` is already ignored). A manual test list is in `docs/manual-qa.md`.
 
+## Android Auto
+Athena Podcasts shows up in Android Auto as a media app with one flat list: every downloaded episode of every podcast, newest first (at most 50). Tap one to play; play/pause, back 10 s and forward 30 s are on the player screen, and steering-wheel or handlebar media keys do the same. Nothing is streamed, so it works without mobile data.
+
+Because the app is sideloaded, Android Auto hides it until you allow unknown sources: on the phone open Android Auto settings, tap **Version** ten times to enable developer mode, open the three-dot menu → **Developer settings**, and turn on **Unknown sources**. Reconnect to the car or mount afterwards.
+
 ## Building
 
 Requirements: a JDK 17+ (Android Studio's bundled JDK works) and the Android 17 (API 37) SDK platform plus build-tools.
