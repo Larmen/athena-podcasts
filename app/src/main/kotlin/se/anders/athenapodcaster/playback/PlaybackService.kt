@@ -258,7 +258,9 @@ class PlaybackService : MediaLibraryService() {
                     listOf(found.episode.imageUrl, found.feedImageUrl), container.settings.settings.first().artStyle,
                 )
                 val item = episodeMediaItem(id, found.episode.title, found.feedTitle, file, art)
-                val start = if (startPositionMs == C.TIME_UNSET) found.episode.positionMs else startPositionMs
+                // An item named by id alone comes from the car, which may ask to start "at 0". The saved listening
+                // position always wins: starting at 0 would overwrite the progress with the first seconds (FR-022, FR-083).
+                val start = found.episode.positionMs
                 MediaSession.MediaItemsWithStartPosition(listOf(item), 0, start)
             }
         }

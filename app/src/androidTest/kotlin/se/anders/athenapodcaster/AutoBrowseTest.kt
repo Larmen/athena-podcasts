@@ -137,6 +137,24 @@ class AutoBrowseTest {
         assertTrue("started at $pos", pos in 119_000..130_000)
     }
 
+    /** Android Auto may ask to start an item "at 0"; that must never overwrite the listening progress. */
+    @Test
+    fun anExplicitStartAtZeroFromTheCarStillResumesAtTheSavedPosition() {
+        val f = newFeed("Show")
+        val id = newEpisode(f, "Long listen", far, downloaded = true, position = 120_000)
+        instrumentation.runOnMainSync {
+            browser.setMediaItem(MediaItem.Builder().setMediaId(id.toString()).build(), 0L)
+            browser.prepare(); browser.play()
+        }
+        waitFor("playing") { var p = false; instrumentation.runOnMainSync { p = browser.isPlaying }; p }
+        val pos = position()
+        assertTrue("started at $pos, not at the saved 120 s", pos in 119_000..135_000)
+        instrumentation.runOnMainSync { browser.pause() }
+        Thread.sleep(1200)
+        val stored = runBlocking { container.episodes.get(id)!!.positionMs }
+        assertTrue("stored position is $stored", stored in 119_000..140_000)
+    }
+
     @Test
     fun aMissingFileIsRefusedAndNeverStreamed() {
         val f = newFeed("Show")
