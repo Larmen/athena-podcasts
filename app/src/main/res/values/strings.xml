@@ -88,6 +88,9 @@
     <string name="episode_queued">Queued</string>
     <string name="episode_failed">Download failed</string>
     <string name="episode_not_downloaded">Not downloaded</string>
+    <string name="delete_download_title">Delete the downloaded file?</string>
+    <string name="delete_download_body">The episode stays in the list and can be downloaded again later. It is also removed from the queue.</string>
+    <string name="delete_download_body_playing">This episode is playing now, so playback stops. The episode stays in the list and can be downloaded again later.</string>
     <string name="queue_title">Queue</string>
     <string name="queue_button">Queue (%1$d)</string>
     <string name="queue_empty">Nothing queued. Use Add to queue on a downloaded episode.</string>

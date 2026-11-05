@@ -208,6 +208,7 @@ class MainActivity : ComponentActivity() {
                             onDownload = { episode -> requestNotificationsOnce(); feedsViewModel.download(episode) },
                             onCancelDownload = feedsViewModel::cancelDownload,
                             onDeleteDownload = feedsViewModel::deleteDownload,
+                            playingEpisodeId = playerState.episodeId,
                             askMobile = askMobile,
                             onConfirmMobile = feedsViewModel::confirmMobile,
                             onDismissMobile = feedsViewModel::dismissMobile,

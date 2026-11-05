@@ -141,7 +141,11 @@ class FeedsViewModel(
 
     fun dismissMobile() { _askMobile.value = null }
     fun cancelDownload(episode: Episode) = viewModelScope.launch { downloads.cancel(episode) }
-    fun deleteDownload(episode: Episode) = viewModelScope.launch { downloads.deleteFile(episode) }
+    /** After the user confirmed. An episode that is playing stops first, since its file is about to go. */
+    fun deleteDownload(episode: Episode) = viewModelScope.launch {
+        if (player.state.value.episodeId == episode.id) player.stopAndClear()
+        downloads.deleteFile(episode)
+    }
 
     /** The real address of a private feed, shown only while the user asks for it (constitution §4). */
     private val _revealed = MutableStateFlow<String?>(null)

@@ -68,6 +68,7 @@ fun EpisodeListScreen(
     onDownload: (Episode) -> Unit,
     onCancelDownload: (Episode) -> Unit,
     onDeleteDownload: (Episode) -> Unit,
+    playingEpisodeId: Long?,
     askMobile: Episode?,
     onConfirmMobile: () -> Unit,
     onDismissMobile: () -> Unit,
@@ -77,6 +78,7 @@ fun EpisodeListScreen(
     var confirmRemove by rememberSaveable { mutableStateOf(false) }
     var confirmPlayedId by rememberSaveable { mutableStateOf<Long?>(null) }
     var confirmAll by rememberSaveable { mutableStateOf(false) }
+    var confirmDeleteId by rememberSaveable { mutableStateOf<Long?>(null) }
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         // FlowRow, not Row: at large font sizes the buttons wrap onto a second line instead of squeezing each other out.
         FlowRow(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalArrangement = Arrangement.Center) {
@@ -113,7 +115,7 @@ fun EpisodeListScreen(
             Text(stringResource(if (filter == EpisodeFilter.All) R.string.episodes_empty else R.string.episodes_empty_filtered), Modifier.padding(24.dp), color = muted())
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
-                items(episodes, key = { it.id }) { EpisodeRow(it, feed?.imageUrl, it.id in queuedIds, onPlay, onToggleQueue, onMarkUnplayed, { e -> confirmPlayedId = e.id }, onDownload, onCancelDownload, onDeleteDownload) }
+                items(episodes, key = { it.id }) { EpisodeRow(it, feed?.imageUrl, it.id in queuedIds, onPlay, onToggleQueue, onMarkUnplayed, { e -> confirmPlayedId = e.id }, onDownload, onCancelDownload) { e -> confirmDeleteId = e.id } }
             }
         }
     }
@@ -131,6 +133,16 @@ fun EpisodeListScreen(
             },
             confirmButton = { TextButton(onClick = { confirmAll = false; onMarkAllPlayed() }) { Text(stringResource(R.string.mark_all_played)) } },
             dismissButton = { TextButton(onClick = { confirmAll = false }) { Text(stringResource(R.string.backup_import_cancel)) } },
+        )
+    }
+    confirmDeleteId?.let { id ->
+        val episode = episodes.firstOrNull { it.id == id }
+        if (episode == null) confirmDeleteId = null else AlertDialog(
+            onDismissRequest = { confirmDeleteId = null },
+            title = { Text(stringResource(R.string.delete_download_title)) },
+            text = { Text(stringResource(if (id == playingEpisodeId) R.string.delete_download_body_playing else R.string.delete_download_body)) },
+            confirmButton = { TextButton(onClick = { confirmDeleteId = null; onDeleteDownload(episode) }) { Text(stringResource(R.string.episode_delete_download)) } },
+            dismissButton = { TextButton(onClick = { confirmDeleteId = null }) { Text(stringResource(R.string.backup_import_cancel)) } },
         )
     }
     confirmPlayedId?.let { id ->
