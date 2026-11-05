@@ -35,7 +35,7 @@ se.anders.athenapodcaster
 │   ├─ secrets/   SecretStore (Keystore AES-GCM)
 │   ├─ settings/  SettingsRepository, SettingsBackup
 │   └─ launcher/  LauncherAppearanceSource (bridge client, plan §3.7)
-├─ playback/    PlaybackService (MediaSessionService), PlayerController, SkipMath
+├─ playback/    PlaybackService (MediaSessionService; MediaLibraryService from Phase 8), AutoLibrary, PlayerController, SkipMath
 ├─ domain/      EpisodeIdentity (guid/dedupe), DownloadSelection (latest N), Resume
 ├─ ui/
 │   ├─ feeds/    FeedListScreen, AddFeedScreen
@@ -115,6 +115,18 @@ Consequences:
 - Process death during download/playback; Bluetooth disconnect; phone calls; sample rate/VBR duration oddities.
 - Locale/time zone, font scale 200 %, light/dark switch while playing.
 - Airplane mode: everything listed still plays (offline-first).
+
+### 3.10 Android Auto (US7, FR-080..089)
+- **Service type.** `PlaybackService` becomes a `MediaLibraryService` (same Media3 artifact `media3-session`, no new dependency). The manifest filter changes to `androidx.media3.session.MediaLibraryService` (keep the `MediaSessionService` action too, so the phone's `SessionToken` keeps binding). `onGetSession` returns a `MediaLibrarySession`; the existing `SkipPlayer`, session activity, media-button preferences and `ProgressSaver` stay as they are.
+- **Declaration.** `res/xml/automotive_app_desc.xml` with `<uses name="media"/>` and `<meta-data android:name="com.google.android.gms.car.application" android:resource="@xml/automotive_app_desc"/>` in the application element.
+- **Library tree.** A small pure `AutoLibrary` class (in `playback/`, no Android types except `MediaItem` building) answers `getLibraryRoot`, `getChildren(parentId, page, pageSize)` and `getItem(id)` from the existing DAOs. Ids: `root`, `continue`, `podcasts`, `feed:<id>`, `episode:<id>` (episode media ids stay the plain numeric id the phone uses, so both sides share one item identity; library items carry `isBrowsable`/`isPlayable`). Root children are marked as list-style via `MediaConstants` content-style extras. Art uses `artworkData` from the local `ArtworkStore` (512 px JPEG, chosen style), never a URL.
+- **Playing from the tree.** `onAddMediaItems` resolves a requested `episode:<id>`/numeric id to the full local `MediaItem` (file URI, metadata, saved position) through the same builder as `PlayerController`; a missing file returns an error result (`SessionError.ERROR_BAD_VALUE`) with the message "Episode not downloaded". No other URI is ever accepted, so the file-only guarantee (FR-024) holds for browsing too.
+- **Trust.** `onConnect`/`MediaLibrarySession.Callback` checks `controllerInfo`: the app itself, `isTrusted` system controllers, and Android Auto's package (`com.google.android.projection.gearhead`, plus `com.google.android.googlequicksearchbox` for the Assistant) may browse; other controllers get playback commands but `getLibraryRoot` returns `ERROR_PERMISSION_DENIED` (FR-088).
+- **Transport.** Reuse the existing back-10/forward-30 `CommandButton`s as custom layout and the next/previous mapping in `SkipPlayer`; Auto shows them on the player screen.
+- **Updates.** When a download finishes or a file is deleted, call `notifyChildrenChanged` for the affected parents so an open car list refreshes (observe the same Room flows as the phone UI, cheap and local).
+- **Limits.** `getChildren` pages by `pageSize` (episodes capped at 50 per podcast); queries are indexed lookups on `downloadedPath`/`feedId`. A 10 k-episode feed is covered by an emulator test (FR-086).
+- **Testing.** JVM tests for `AutoLibrary` tree shapes, empty states, cap, ordering and the "played after unplayed" rule once decided. Emulator tests: a `MediaBrowser` connected to the service lists the tree, plays an item, is refused for a missing file, and an untrusted caller is denied browse. Manual: Desktop Head Unit (Android SDK "Android Auto Desktop Head Unit Emulator", started with `adb forward tcp:5277 tcp:5277` and Android Auto's developer-mode "Start head unit server"), then a real car. Documented in `docs/manual-qa.md`.
+- **Risks.** Android Auto may cache the tree (mitigated by `notifyChildrenChanged`); sideloaded apps need the Unknown-sources switch (FR-089); behaviour on Android 17 with the current Android Auto build is only known by trying it on the DHU. Voice search and Automotive OS are separate specs.
 
 ## 4. Dependencies (justify each)
 androidx.core, activity-compose, lifecycle-viewmodel-compose, compose BOM + material3, **media3-exoplayer / media3-session / media3-ui** (playback), **work-runtime-ktx** (background), **room-runtime/room-ktx + KSP room-compiler** (episode DB), **okhttp** (+ `mockwebserver` test) (HTTP), datastore-preferences, kotlinx-serialization-json, junit, turbine; step two: **coil-compose + coil-network-okhttp**. Nothing else without a plan amendment.

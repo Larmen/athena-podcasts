@@ -14,7 +14,7 @@ A minimalist Android podcast player that does the essentials: subscribe to RSS f
 **Non-goals (v1)**
 - Streaming of episodes that are not downloaded.
 - Podcast discovery/search directories, recommendations, social features.
-- Playback speed, sleep timer, chapters, queues/playlists, equaliser, Chromecast/Auto/Wear (kept in mind, §8).
+- Playback speed, sleep timer, chapters, queues/playlists, equaliser, Chromecast/Wear (kept in mind, §8); Android Auto is added by US7 (Phase 8).
 - Cloud sync, accounts, ads, analytics.
 - Android 15 or older; Play Store distribution (sideload first).
 - Paywalled content that needs an interactive web login (cookie/OAuth), and HTTP Basic-auth feeds (deferred, §8). v1 supports private-URL feeds only.
@@ -43,6 +43,9 @@ As a user the app looks like Athena Launcher and picks up its theme, typeface an
 
 ### US6 – Album art (P2, step two)
 As a user I see the show's and episode's artwork in the list, the player and the notification/lock screen.
+
+### US7 – Listen in the car with Android Auto (P2)
+As a driver I want to open Athena Podcasts in Android Auto, pick a podcast and an episode from a short list, and control playback with the car's screen and steering-wheel buttons, with no mobile data needed because only downloaded episodes are offered. *Independent test:* with the Desktop Head Unit (and later a real car), open the app, browse to a downloaded episode, play, pause, skip 10 s back and 30 s forward, and see the phone app show the same position afterwards.
 
 ## 4. Functional requirements
 
@@ -95,6 +98,18 @@ As a user I see the show's and episode's artwork in the list, the player and the
 - FR-065 Export/import of the app's own settings JSON (`app` = "athena-podcaster", `version`), same rules as the launcher's FR-061 (unknown keys ignored, bad values clamped, other apps' files rejected). Credentials are never in this file.
 - FR-066 Licences screen as in the launcher (FR-062): Athena Podcasts (MIT), bundled fonts (OFL), AndroidX/Media3/OkHttp etc. (Apache-2.0), each expandable to the full text, shipped in the app.
 
+**Android Auto (US7)**
+- FR-080 The app is offered as a media app in Android Auto (phone projection). Android Automotive OS is out of scope. The app declares itself as an Auto media app and exposes a browsable media library from the playback service.
+- FR-081 Browse tree, at most three levels so it is safe while driving: **root** → "Continue listening" (the episode last played, if it is downloaded and unfinished; one item, plays directly) and "Podcasts"; **Podcasts** → one entry per subscribed podcast that has at least one downloaded episode, in the same order as the phone's list, with its art; **podcast** → its downloaded episodes, newest first, capped at 50, each playable. Only downloaded episodes ever appear; nothing in the tree can start a download or a stream.
+- FR-082 Empty states are plain text items, not blank screens: "Nothing downloaded yet" when there are no downloaded episodes at all; "No downloaded episodes" inside a podcast that lost them. Items show title, podcast name and duration where known.
+- FR-083 Playing from the car uses exactly the phone's rules: the same player, the saved position is resumed, auto-complete and played tracking (FR-014) and position saving (FR-022) behave the same, and the phone's Now Playing bar and the car show the same state. Selecting an item whose file has since disappeared is refused with a short message, never a network fetch (FR-024).
+- FR-084 Transport in the car: play/pause, skip back 10 s and skip forward 30 s as actions on the car's player screen; the steering-wheel next/previous keys map to the same skips as headset keys (FR-021b).
+- FR-085 Art in the car is the locally stored art in the chosen style (FR-043); no art is fetched while connected to a car.
+- FR-086 The library reads only the local database and files, works without network and with the app's UI not running, and answers a browse request in under 500 ms for a feed with 10,000 episodes.
+- FR-087 No settings, text input or destructive actions (delete, mark played, unsubscribe) are offered in the car.
+- FR-088 The browse tree is served only to trusted controllers: Android Auto, the system, and the app itself. Other apps that connect to the session can control playback as before but cannot list the library (it reveals the user's subscriptions).
+- FR-089 Sideloading: Android Auto lists apps that did not come from Google Play only after the user enables developer mode in Android Auto's settings (tap "Version" 10 times) and turns on "Unknown sources". The README documents this; the app does not need to detect it.
+
 ## 5. Non-functional requirements
 - NFR-001 Platforms: minSdk 36, target/compile 37. Testing on the Android 17 (API 37) emulator and the user's phone; Android 16 is supported by `minSdk` but not tested.
 - NFR-002 Cold start to interactive list < 500 ms (list comes from the local DB; no network on the critical path). Opening the player and starting playback < 300 ms.
@@ -115,7 +130,7 @@ As a user I see the show's and episode's artwork in the list, the player and the
 Evaluated approach: **do not fork a full app**. AntennaPod (GPL-3.0, Java/Kotlin, XML Views) is the mature reference but its licence conflicts with Constitution §9 (MIT, own code) and its UI stack differs from the Compose launcher. Instead, build thin on proven building blocks (all Apache-2.0 or similar, see plan §4): **Media3** (playback, MediaSession, notification), **WorkManager** (refresh/downloads), **Room**, **OkHttp**, and a small purpose-written RSS parser on `XmlPullParser`. Use AntennaPod only as a behavioural reference (feed edge cases, download policies). A permissively-licensed feed-parsing library may replace our parser if it saves real effort (decide in task T2.1).
 
 ## 8. Out of scope but kept in mind
-HTTP Basic-auth feeds (username + password; host-bound `Authorization` header), autoplay of the next episode, playback speed and skip-silence, sleep timer, queue, chapters/transcripts (Podcasting 2.0), podcast search (iTunes/Podcast Index), Android Auto, widgets, per-feed overrides, cloud sync, an Athena Launcher home-screen "now playing" row.
+HTTP Basic-auth feeds (username + password; host-bound `Authorization` header), autoplay of the next episode, playback speed and skip-silence, sleep timer, queue, chapters/transcripts (Podcasting 2.0), podcast search (iTunes/Podcast Index), voice search in the car ("play X"), Android Automotive OS (cars with Android built in), widgets, per-feed overrides, cloud sync, an Athena Launcher home-screen "now playing" row.
 
 ## 9. Decisions (2026-11-05)
 - Name: **Athena Podcasts**. Application id: `se.anders.athenapodcaster`. Licence: MIT. Sideload first.
@@ -129,5 +144,7 @@ HTTP Basic-auth feeds (username + password; host-bound `Authorization` header), 
 - Resolved 2026-11-05: both paid feeds use private URLs with a token. HTTP Basic is deferred.
 - Resolved 2026-11-05: launcher bridge uses a signature-level permission. Android signs every APK anyway; debug builds made on this Mac share `~/.android/debug.keystore`, so sideloaded debug builds of both apps already match with no extra work. For release APKs, sign both with one keystore (plan §3.7).
 - Resolved 2026-11-05: autoplay of the next episode is deferred to a future spec (FR-025 stays: no autoplay in v1).
+- Open (Android Auto, 2026-11-05): should played-but-still-downloaded episodes appear in the car list? Proposed: yes, listed after unplayed ones, so a replay is possible. [NEEDS CLARIFICATION]
+- Open (Android Auto): voice search ("play <podcast>") deferred; add via a later spec if wanted.
 - Resolved 2026-11-05: auto-download default is 1 (latest episode only).
 - Resolved 2026-11-05: "Follow launcher" includes the text-size percentage, applied on top of the system font scale (they multiply), exactly as in the launcher.
