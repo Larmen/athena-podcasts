@@ -45,7 +45,7 @@ As a user the app looks like Athena Launcher and picks up its theme, typeface an
 As a user I see the show's and episode's artwork in the list, the player and the notification/lock screen.
 
 ### US7 – Listen in the car with Android Auto (P2)
-As a driver I want to open Athena Podcasts in Android Auto, pick a podcast and an episode from a short list, and control playback with the car's screen and steering-wheel buttons, with no mobile data needed because only downloaded episodes are offered. *Independent test:* with the Desktop Head Unit (and later a real car), open the app, browse to a downloaded episode, play, pause, skip 10 s back and 30 s forward, and see the phone app show the same position afterwards.
+As a motorcyclist riding in thick gloves I want to open Athena Podcasts in Android Auto and see one flat list of my downloaded episodes, newest first, so a single large tap starts the one I want, with play/pause and the skips on the car or mount screen and on my handlebar/helmet controls. No mobile data is needed because only downloaded episodes are offered. *Independent test:* with the Desktop Head Unit (and later on the bike), open the app, tap an episode in the list, play, pause, skip 10 s back and 30 s forward, and see the phone app show the same position afterwards.
 
 ## 4. Functional requirements
 
@@ -100,14 +100,15 @@ As a driver I want to open Athena Podcasts in Android Auto, pick a podcast and a
 
 **Android Auto (US7)**
 - FR-080 The app is offered as a media app in Android Auto (phone projection). Android Automotive OS is out of scope. The app declares itself as an Auto media app and exposes a browsable media library from the playback service.
-- FR-081 Browse tree, at most three levels so it is safe while driving: **root** → "Continue listening" (the episode last played, if it is downloaded and unfinished; one item, plays directly) and "Podcasts"; **Podcasts** → one entry per subscribed podcast that has at least one downloaded episode, in the same order as the phone's list, with its art; **podcast** → its downloaded episodes, newest first, capped at 50, each playable. Only downloaded episodes ever appear; nothing in the tree can start a download or a stream.
-- FR-082 Empty states are plain text items, not blank screens: "Nothing downloaded yet" when there are no downloaded episodes at all; "No downloaded episodes" inside a podcast that lost them. Items show title, podcast name and duration where known.
+- FR-081 Browse tree: **one flat list**. The root shows every downloaded episode of every subscribed podcast, newest release date first, capped at 50 items, each playable with one tap. There are no podcast folders, no sub-levels and no extra entries, so reaching an episode takes one tap (large gloved hands, FR-090). Title, podcast name and duration are shown; played and unplayed downloaded episodes are listed alike. Only downloaded episodes ever appear; nothing in the tree can start a download or a stream.
+- FR-082 Empty state: when nothing is downloaded, the list holds a single plain-text item, "Nothing downloaded yet", not a blank screen.
 - FR-083 Playing from the car uses exactly the phone's rules: the same player, the saved position is resumed, auto-complete and played tracking (FR-014) and position saving (FR-022) behave the same, and the phone's Now Playing bar and the car show the same state. Selecting an item whose file has since disappeared is refused with a short message, never a network fetch (FR-024).
 - FR-084 Transport in the car: play/pause, skip back 10 s and skip forward 30 s as actions on the car's player screen; the steering-wheel next/previous keys map to the same skips as headset keys (FR-021b).
-- FR-085 Art in the car is the locally stored art in the chosen style (FR-043); no art is fetched while connected to a car.
+- FR-085 Art on each item is the locally stored episode or podcast art in the chosen style (FR-043); no art is fetched while connected.
 - FR-086 The library reads only the local database and files, works without network and with the app's UI not running, and answers a browse request in under 500 ms for a feed with 10,000 episodes.
 - FR-087 No settings, text input or destructive actions (delete, mark played, unsubscribe) are offered in the car.
 - FR-088 The browse tree is served only to trusted controllers: Android Auto, the system, and the app itself. Other apps that connect to the session can control playback as before but cannot list the library (it reveals the user's subscriptions).
+- FR-090 Glove use (motorcycle). Android Auto draws its own screens, so touch-target size is set by the head unit or mount, not by the app. The app therefore does what it controls: a single-level list with the fewest possible taps to playback; only the three transport actions play/pause, back 10 s, forward 30 s on the player screen (no extra custom actions); every control is also reachable by media keys, so handlebar and helmet-intercom buttons (play/pause, next = forward 30 s, previous = back 10 s) work without touching the screen (FR-021b); and no dialogs, confirmations or text prompts appear while connected. Whether the touch targets are big enough on the actual bike screen is checked by the user in T8.7.
 - FR-089 Sideloading: Android Auto lists apps that did not come from Google Play only after the user enables developer mode in Android Auto's settings (tap "Version" 10 times) and turns on "Unknown sources". The README documents this; the app does not need to detect it.
 
 ## 5. Non-functional requirements
@@ -144,7 +145,8 @@ HTTP Basic-auth feeds (username + password; host-bound `Authorization` header), 
 - Resolved 2026-11-05: both paid feeds use private URLs with a token. HTTP Basic is deferred.
 - Resolved 2026-11-05: launcher bridge uses a signature-level permission. Android signs every APK anyway; debug builds made on this Mac share `~/.android/debug.keystore`, so sideloaded debug builds of both apps already match with no extra work. For release APKs, sign both with one keystore (plan §3.7).
 - Resolved 2026-11-05: autoplay of the next episode is deferred to a future spec (FR-025 stays: no autoplay in v1).
-- Open (Android Auto, 2026-11-05): should played-but-still-downloaded episodes appear in the car list? Proposed: yes, listed after unplayed ones, so a replay is possible. [NEEDS CLARIFICATION]
+- Resolved 2026-11-05 (Android Auto): only downloaded episodes, one flat list of all podcasts by release date, newest first, played and unplayed alike (FR-081). Use is on a motorcycle in thick gloves (FR-090).
+- Open (Android Auto): an in-app large-button "ride mode" screen for the phone itself, for when the phone is the mount screen and Android Auto is not used. Not in this spec; decide after trying the DHU and the real bike setup. [NEEDS CLARIFICATION]
 - Open (Android Auto): voice search ("play <podcast>") deferred; add via a later spec if wanted.
 - Resolved 2026-11-05: auto-download default is 1 (latest episode only).
 - Resolved 2026-11-05: "Follow launcher" includes the text-size percentage, applied on top of the system font scale (they multiply), exactly as in the launcher.

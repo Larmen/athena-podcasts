@@ -69,12 +69,12 @@ Order matters. Each task leaves the app building. `[P]` = can run in parallel wi
 - [x] T7.9 (2026-11-05; 3 new emulator tests, 2 new JVM tests) Fix: "Last refresh failed: Could not reach the server" stayed on every podcast after a failed automatic refresh although refreshing by hand worked. Connection failures are retried once, the scheduled refresh no longer records them, refreshes of one feed are serialized, and the message now names the real reason. Which automatic trigger failed on the phone was not established (a cold start at 13:23 refreshed all three feeds fine)
 
 ## Phase 8 – Android Auto (US7) · FR-080..089
-- [ ] T8.0 Decide the open question in spec §10 (played episodes in the car list). Plan §3.10
-- [ ] T8.1 `AutoLibrary` (root, Continue listening, Podcasts, podcast, episode; cap 50; empty states; paging) + JVM tests (FR-081, 082, 086)
+- [x] T8.0 (2026-11-05) Decided: one flat list of downloaded episodes, newest first, played and unplayed alike; glove use drives the design (FR-081, 090)
+- [ ] T8.1 `AutoLibrary` (flat root of downloaded episodes across podcasts, newest first; cap 50; empty state) + JVM tests (FR-081, 082, 086)
 - [ ] T8.2 `PlaybackService` → `MediaLibraryService` with `MediaLibrarySession` callback (`getLibraryRoot/getChildren/getItem/onAddMediaItems`); phone `PlayerController` still binds; existing PlaybackService/MediaKeys tests stay green (FR-080, 083)
 - [ ] T8.3 Manifest + `automotive_app_desc.xml`; art from the local store in the library items (FR-080, 085)
 - [ ] T8.4 Trusted-controller check and refusal of missing files (FR-083, 088) + emulator tests with a `MediaBrowser` (list, play, missing file, untrusted caller)
 - [ ] T8.5 `notifyChildrenChanged` when downloads finish or files are deleted (FR-081)
 - [ ] T8.6 Performance test: 10 k-episode feed browse < 500 ms (FR-086)
-- [ ] T8.7 Run on the Desktop Head Unit: browse, play, pause, skip 10/30, phone state matches (US7); fix what shows up
+- [ ] T8.7 Run on the Desktop Head Unit: tap an episode, play, pause, skip 10/30, phone state matches (US7); then the user tries it on the bike with gloves and media keys (FR-090); fix what shows up. If targets are too small, decide the "ride mode" question in spec §10
 - [ ] T8.8 README (sideloading with Unknown sources, FR-089) and `docs/manual-qa.md` (real car, steering-wheel keys, phone call during playback, no network)
