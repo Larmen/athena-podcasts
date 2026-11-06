@@ -15,11 +15,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -69,6 +71,8 @@ fun EpisodeListScreen(
     onCancelDownload: (Episode) -> Unit,
     onDeleteDownload: (Episode) -> Unit,
     playingEpisodeId: Long?,
+    isPlaying: Boolean,
+    onPause: () -> Unit,
     askMobile: Episode?,
     onConfirmMobile: () -> Unit,
     onDismissMobile: () -> Unit,
@@ -114,8 +118,17 @@ fun EpisodeListScreen(
         if (episodes.isEmpty()) {
             Text(stringResource(if (filter == EpisodeFilter.All) R.string.episodes_empty else R.string.episodes_empty_filtered), Modifier.padding(24.dp), color = muted())
         } else {
-            LazyColumn(Modifier.fillMaxSize()) {
-                items(episodes, key = { it.id }) { EpisodeRow(it, feed?.imageUrl, it.id in queuedIds, onPlay, onToggleQueue, onMarkUnplayed, { e -> confirmPlayedId = e.id }, onDownload, onCancelDownload) { e -> confirmDeleteId = e.id } }
+            // FR-016: opening the page while one of its episodes is loaded scrolls to that episode (once per visit).
+            val listState = rememberLazyListState()
+            var scrolledToPlaying by rememberSaveable { mutableStateOf(false) }
+            LaunchedEffect(episodes.isNotEmpty(), playingEpisodeId) {
+                if (scrolledToPlaying) return@LaunchedEffect
+                val index = episodes.indexOfFirst { it.id == playingEpisodeId }
+                if (index >= 0) listState.scrollToItem(index)
+                scrolledToPlaying = true
+            }
+            LazyColumn(Modifier.fillMaxSize(), state = listState) {
+                items(episodes, key = { it.id }) { EpisodeRow(it, feed?.imageUrl, it.id in queuedIds, it.id == playingEpisodeId && isPlaying, onPause, onPlay, onToggleQueue, onMarkUnplayed, { e -> confirmPlayedId = e.id }, onDownload, onCancelDownload) { e -> confirmDeleteId = e.id } }
             }
         }
     }
@@ -179,6 +192,8 @@ private fun EpisodeRow(
     episode: Episode,
     feedImageUrl: String?,
     queued: Boolean,
+    playing: Boolean,
+    onPause: () -> Unit,
     onPlay: (Episode) -> Unit,
     onToggleQueue: (Episode) -> Unit,
     onMarkUnplayed: (Episode) -> Unit,
@@ -203,7 +218,8 @@ private fun EpisodeRow(
     val meta = listOfNotNull(formatDate(episode.publishedAt), formatDuration(episode.durationSec), stateText + percent).joinToString(" · ")
     val art = listOf(episode.imageUrl, feedImageUrl)
     // One unambiguous label per button for screen readers: "Play, <episode title>".
-    val playLabel = stringResource(R.string.episode_play) + ", " + episode.title
+    val playText = stringResource(if (playing) R.string.player_pause else R.string.episode_play)
+    val playLabel = playText + ", " + episode.title
     val deleteLabel = stringResource(R.string.episode_delete_download) + ", " + episode.title
     val cancelLabel = stringResource(R.string.episode_cancel_download) + ", " + episode.title
     val downloadLabel = stringResource(R.string.episode_download) + ", " + episode.title
@@ -228,7 +244,7 @@ private fun EpisodeRow(
         FlowRow(Modifier.padding(start = textStart).offset(x = (-12).dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             when (episode.downloadState) {
                     DownloadState.Done -> {
-                        TextButton(modifier = Modifier.semantics { contentDescription = playLabel }, onClick = { onPlay(episode) }) { Text(stringResource(R.string.episode_play)) }
+                        TextButton(modifier = Modifier.semantics { contentDescription = playLabel }, onClick = { if (playing) onPause() else onPlay(episode) }) { Text(playText) }
                         if (!episode.played) {
                             val queueLabel = stringResource(if (queued) R.string.queue_remove else R.string.queue_add) + ", " + episode.title
                             TextButton(modifier = Modifier.semantics { contentDescription = queueLabel }, onClick = { onToggleQueue(episode) }) {

@@ -209,6 +209,8 @@ class MainActivity : ComponentActivity() {
                             onCancelDownload = feedsViewModel::cancelDownload,
                             onDeleteDownload = feedsViewModel::deleteDownload,
                             playingEpisodeId = playerState.episodeId,
+                            isPlaying = playerState.playWhenReady,
+                            onPause = playerViewModel::togglePlayPause,
                             askMobile = askMobile,
                             onConfirmMobile = feedsViewModel::confirmMobile,
                             onDismissMobile = feedsViewModel::dismissMobile,
