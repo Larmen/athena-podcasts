@@ -92,6 +92,18 @@ class QueuePlaybackTest {
     }
 
     @Test
+    fun theLastEpisodeLeavesThePlayerWhenItEnds() {
+        val a = episode(1, position = 296_000)
+        play(a)
+        waitFor("a is playing") { state().episodeId == a.id }
+        waitFor("a is unloaded") { state().episodeId == null }
+        Thread.sleep(500)
+        val saved = runBlocking { container.episodes.get(a.id)!! }
+        assertTrue("a is played", saved.played)
+        assertEquals("position reset", 0L, saved.positionMs)
+    }
+
+    @Test
     fun aQueuedEpisodeResumesWhereItWasLeft() {
         val a = episode(1, position = 296_000)
         val b = episode(2, position = 100_000)

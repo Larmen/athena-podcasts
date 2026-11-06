@@ -341,7 +341,11 @@ class PlaybackService : MediaLibraryService() {
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) = tracker.onPlayWhenReadyChanged(playWhenReady)
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState == Player.STATE_ENDED) tracker.onEnded()
+            if (playbackState == Player.STATE_ENDED) {
+                tracker.onEnded()
+                // FR-103: nothing follows, so the finished episode leaves the Now Playing bar, the player and the lock screen.
+                player.clearMediaItems()
+            }
         }
 
         /** FR-103, FR-106: moving to the next queued episode marks the finished one played; any other jump saves its position. */
@@ -349,6 +353,8 @@ class PlaybackService : MediaLibraryService() {
             oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, @Player.DiscontinuityReason reason: Int,
         ) {
             val oldId = oldPosition.mediaItem?.mediaId?.toLongOrNull() ?: return
+            // Unloading (end of the queue, stop) is not a jump: the position was saved when playback stopped.
+            if (reason == Player.DISCONTINUITY_REASON_REMOVE && newPosition.mediaItem == null) return
             if (oldPosition.mediaItem?.mediaId == newPosition.mediaItem?.mediaId) return
             val progress = if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) Progress(0, played = true)
             else Progress(oldPosition.positionMs.coerceAtLeast(0), played = false)
