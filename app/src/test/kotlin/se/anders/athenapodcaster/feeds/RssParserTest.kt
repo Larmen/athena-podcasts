@@ -172,6 +172,9 @@ class RssParserTest {
         assertEquals(expected, parseFeedDate("Tue, 3 Nov 2026 06:00:00 GMT"))
         assertEquals(expected, parseFeedDate("3 Nov 2026 06:00:00 +0000"))
         assertEquals(expected, parseFeedDate("Tue, 03 Nov 2026 07:00:00 +0100"))
+        // A wrong weekday (3 Nov 2026 is a Tuesday) must not lose the date.
+        assertEquals(expected, parseFeedDate("Thu, 03 Nov 2026 06:00:00 +0000"))
+        assertEquals(expected, parseFeedDate("Wednesday, 3 Nov 2026 06:00:00 GMT"))
         assertEquals(expected, parseFeedDate("Tue, 03 Nov 2026 01:00:00 EST"))
         assertEquals(expected, parseFeedDate("2026-11-03T06:00:00Z"))
         assertEquals(expected, parseFeedDate("  Tue,  03 Nov 2026   06:00:00 +0000 "))

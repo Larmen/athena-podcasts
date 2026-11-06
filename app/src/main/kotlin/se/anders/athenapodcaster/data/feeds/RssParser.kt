@@ -249,6 +249,10 @@ private val DATE_FORMATTERS: List<DateTimeFormatter> = listOf(
     "EEE, d MMM yy HH:mm:ss zzz",
     "d MMM yyyy HH:mm:ss Z",
     "d MMM yyyy HH:mm:ss zzz",
+    "d MMM yy HH:mm:ss Z",
+    "d MMM yy HH:mm:ss zzz",
+    "d MMM yyyy HH:mm Z",
+    "d MMM yyyy HH:mm zzz",
     "EEE d MMM yyyy HH:mm:ss Z",
 ).map { DateTimeFormatter.ofPattern(it, Locale.ENGLISH) }
 
@@ -256,6 +260,10 @@ private val DATE_FORMATTERS: List<DateTimeFormatter> = listOf(
 fun parseFeedDate(raw: String?): Long? {
     val text = raw?.trim()?.replace(Regex("\\s+"), " ").orEmpty()
     if (text.isEmpty()) return null
+    // The weekday is redundant, and some feeds get it wrong ("Wed, 05 Nov 2026" is a Thursday); java.time would
+    // reject the whole date, so it is dropped before parsing and the day of the month is trusted.
+    val noWeekday = text.replace(Regex("^[A-Za-z]{3,9},?\\s+"), "")
+    if (noWeekday != text) parseFeedDate(noWeekday)?.let { return it }
     try { return ZonedDateTime.parse(text, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli() } catch (_: DateTimeParseException) {}
     for (formatter in DATE_FORMATTERS) {
         try { return ZonedDateTime.parse(text, formatter).toInstant().toEpochMilli() } catch (_: DateTimeParseException) {}
