@@ -10,6 +10,11 @@ enum class EpisodeFilter {
     /** The filter button steps through them in this order and wraps around. */
     fun next(): EpisodeFilter = entries[(ordinal + 1) % entries.size]
 
+    companion object {
+        /** What a podcast's episode list shows when the app starts: the episodes still to hear (FR-014). */
+        val Default = Unplayed
+    }
+
     fun apply(episodes: List<Episode>): List<Episode> = when (this) {
         All -> episodes
         Downloaded -> episodes.filter { it.downloadState == DownloadState.Done }

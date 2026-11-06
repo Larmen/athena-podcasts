@@ -20,6 +20,9 @@ class EpisodeFilterTest {
     )
 
     @Test
+    fun theListStartsOnUnplayedOnly() = assertEquals(EpisodeFilter.Unplayed, EpisodeFilter.Default)
+
+    @Test
     fun allKeepsEverything() = assertEquals(list.map { it.id }, EpisodeFilter.All.apply(list).map { it.id })
 
     @Test

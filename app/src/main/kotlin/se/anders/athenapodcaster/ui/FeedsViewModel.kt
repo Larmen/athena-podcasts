@@ -74,7 +74,7 @@ class FeedsViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** FR-014: the episode list shows everything, only downloaded episodes, or only unplayed ones. */
-    private val _filter = MutableStateFlow(EpisodeFilter.All)
+    private val _filter = MutableStateFlow(EpisodeFilter.Default)
     val filter: StateFlow<EpisodeFilter> = _filter
 
     @OptIn(ExperimentalCoroutinesApi::class)
