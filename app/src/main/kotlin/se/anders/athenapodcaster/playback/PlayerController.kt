@@ -97,6 +97,19 @@ class PlayerController(private val context: Context) {
         controller?.run { stop(); clearMediaItems() }
     }
 
+    /**
+     * The episode [id] is about to lose its file (marked played). If it is the one loaded, playback moves on to the
+     * next queued episode, which starts playing (FR-104); with an empty queue it stops and unloads instead.
+     */
+    fun releaseEpisode(id: Long) {
+        val c = controller ?: return
+        if (c.currentMediaItem?.mediaId != id.toString()) return
+        // "Next" is mapped to forward 30 s (FR-021b), so jump to the next playlist entry by index.
+        val next = c.currentMediaItemIndex + 1
+        if (next < c.mediaItemCount) { c.seekTo(next, 0); c.prepare(); c.play() }
+        else { c.stop(); c.clearMediaItems() }
+    }
+
     fun seekBack() { controller?.seekBack() }
     fun seekForward() { controller?.seekForward() }
 

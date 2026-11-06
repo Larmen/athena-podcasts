@@ -66,9 +66,9 @@ class PlayerViewModel(
     fun seekForward() = player.seekForward()
     fun setUnplayed(episodeId: Long) = viewModelScope.launch { episodes.setPlayed(episodeId, false) }
 
-    /** After the user confirmed: stop (the file is about to go), mark played and delete the download. */
+    /** After the user confirmed: move on to the next queued episode (or stop), mark played and delete the download. */
     fun markPlayed(episodeId: Long) = viewModelScope.launch {
-        player.stopAndClear()
+        player.releaseEpisode(episodeId)
         downloads.markPlayedAndDelete(episodeId)
     }
 

@@ -116,12 +116,15 @@ class FeedsViewModel(
     /** After the user confirmed: every unplayed episode of the feed is played and its download removed (FR-014). */
     fun markAllPlayed(feedId: Long) = viewModelScope.launch {
         val changed = episodeRepo.getByFeed(feedId).filter { !it.played }.map { it.id }
-        if (player.state.value.episodeId in changed) player.stopAndClear() // its file is about to go
+        player.state.value.episodeId?.takeIf { it in changed }?.let(player::releaseEpisode) // its file is about to go
         downloads.markAllPlayedAndDelete(feedId)
     }
 
     /** After the user confirmed: played, and the downloaded file goes. */
-    fun markPlayed(episode: Episode) = viewModelScope.launch { downloads.markPlayedAndDelete(episode.id) }
+    fun markPlayed(episode: Episode) = viewModelScope.launch {
+        player.releaseEpisode(episode.id) // the file is about to go; the next queued episode takes over
+        downloads.markPlayedAndDelete(episode.id)
+    }
 
     /** An episode waiting for the user to confirm a download over mobile data (FR-033). */
     private val _askMobile = MutableStateFlow<Episode?>(null)

@@ -78,6 +78,20 @@ class QueuePlaybackTest {
     }
 
     @Test
+    fun markingTheCurrentEpisodePlayedStartsTheNextQueuedOne() {
+        val a = episode(1); val b = episode(2)
+        runBlocking { container.queue.add(b.id) }
+        play(a)
+        waitFor("a is playing") { state().episodeId == a.id && state().isPlaying }
+        Thread.sleep(2_000) // the player mirrors the queue shortly after playback starts (FR-103)
+        instrumentation.runOnMainSync { controller.releaseEpisode(a.id) } // FR-109
+        runBlocking { container.downloads.markPlayedAndDelete(a.id) }
+        waitFor("b starts by itself") { state().episodeId == b.id && state().isPlaying }
+        waitFor("b leaves the queue") { queueIds().isEmpty() }
+        assertTrue(runBlocking { container.episodes.get(a.id)!!.played })
+    }
+
+    @Test
     fun aQueuedEpisodeResumesWhereItWasLeft() {
         val a = episode(1, position = 296_000)
         val b = episode(2, position = 100_000)
