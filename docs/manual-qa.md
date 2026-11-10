@@ -69,3 +69,6 @@ person with a phone can check.
 
 ## Home-screen widget (FR-120)
 - [ ] Add the 4 x 1 widget from the launcher's widget picker; it shows "Nothing playing"; start an episode: title appears, Pause works from the widget (with gloves: the button is big enough); tapping the title opens the player; dark mode inverts it.
+
+## Home-screen widget (FR-120)
+- [ ] Add the 4 x 1 widget from the widget picker; it shows "Nothing playing"; start an episode: title appears, Pause works from the widget (big enough with gloves); tapping the title opens the player; dark mode inverts it.

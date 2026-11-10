@@ -90,6 +90,6 @@ Order matters. Each task leaves the app building. `[P]` = can run in parallel wi
 - [~] T9.8 (2026-11-05) README and QA list updated; the lock screen after an advance, the DHU Queue button and the bike are still to be tried Manual: lock screen after an advance, DHU Queue button, the bike; README and `docs/manual-qa.md`
 
 ## Phase 10 – Home-screen widget · FR-120
-- [ ] T10.1 Spec + plan (FR-120, plan §3.12)
-- [ ] T10.2 `WidgetState` + `PlayerWidget` + layout/info/colours/manifest; service pushes state
-- [ ] T10.3 Tests (JVM mapping, emulator toggle), look checked on the emulator; README/manual QA line
+- [x] T10.1 (2026-11-10) Spec + plan (FR-120, plan §3.12)
+- [x] T10.2 (2026-11-10) `WidgetState` + `PlayerWidget` + layout/info/colours/manifest; service pushes state
+- [~] T10.3 (2026-11-10; 2 JVM + 1 emulator test pass, lint clean; the look on a real home screen was not seen) Tests (JVM mapping, emulator toggle), look checked on the emulator; README/manual QA line
