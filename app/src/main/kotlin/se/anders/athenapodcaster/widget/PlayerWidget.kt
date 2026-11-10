@@ -79,7 +79,7 @@ class PlayerWidget : AppWidgetProvider() {
             if (ids.isEmpty()) return
             scope.launch {
                 val container = (app as AthenaPodcasterApplication).container
-                val appearance = effectiveAppearance(container.settings.settings.first(), container.launcherAppearance.appearance.value)
+                val appearance = effectiveAppearance(container.settings.settings.first(), container.launcherAppearance.loadNow())
                 val s = state
                 ids.forEach { id ->
                     val o = manager.getAppWidgetOptions(id)

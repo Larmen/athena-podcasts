@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import se.anders.athenapodcaster.data.settings.TypefaceChoice
 import se.anders.athenapodcaster.data.settings.ThemeMode
 import se.anders.athenapodcaster.data.settings.clampTextScale
@@ -74,6 +75,9 @@ class LauncherAppearanceSource(context: Context, private val uri: Uri = Launcher
     override fun refresh() {
         scope.launch { _appearance.value = load() }
     }
+
+    /** Reads the launcher now, for callers (the widget) that start in a fresh process before the first background load is done. */
+    suspend fun loadNow(): LauncherAppearance? = withContext(Dispatchers.IO) { load().also { _appearance.value = it } }
 
     private fun load(): LauncherAppearance? = try {
         resolver.query(uri, null, null, null, null)?.use { c -> if (c.moveToFirst()) read(c) else null }
