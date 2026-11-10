@@ -104,6 +104,23 @@ class QueuePlaybackTest {
     }
 
     @Test
+    fun theWidgetShowsTheEpisodeAndItsButtonTogglesPlayback() {
+        val a = episode(1)
+        play(a)
+        waitFor("a is playing") { state().episodeId == a.id && state().isPlaying }
+        waitFor("widget shows a") { se.anders.athenapodcaster.widget.PlayerWidget.state.let { it.title == "E1" && it.playing } }
+        fun toggle() = context.sendBroadcast(
+            android.content.Intent(se.anders.athenapodcaster.widget.PlayerWidget.ACTION_TOGGLE)
+                .setClassName(context.packageName, se.anders.athenapodcaster.widget.PlayerWidget::class.java.name),
+        )
+        toggle() // FR-120
+        waitFor("paused by the widget") { !state().playWhenReady }
+        waitFor("widget shows paused") { !se.anders.athenapodcaster.widget.PlayerWidget.state.playing }
+        toggle()
+        waitFor("playing again") { state().isPlaying }
+    }
+
+    @Test
     fun aQueuedEpisodeResumesWhereItWasLeft() {
         val a = episode(1, position = 296_000)
         val b = episode(2, position = 100_000)

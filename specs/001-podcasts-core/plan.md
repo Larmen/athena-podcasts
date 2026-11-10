@@ -139,6 +139,13 @@ Consequences:
 - **Testing.** JVM: queue ordering and move rules in a pure `QueueOrder` helper (add, remove, move up/down at ends, purge). Emulator: migration 3→4; queue repository against Room (cascade, purge, join filter); a service test queues a second episode, lets the first reach its end (a short sample file, seek near the end) and sees the second start with the first marked played; play-now keeps the queue; the Auto browser's timeline shows the upcoming items. Manual: lock screen cover after advance, Auto Queue button on the DHU, bike.
 - **Risks.** Playlist edits while the player is preparing; cover bytes in a long timeline (mitigated by the 160 px size and a cap of the first 10 upcoming items mirrored in the player; the rest wait in the DB); a transition and a user skip arriving together (the discontinuity reason decides).
 
+### 3.12 Home-screen widget (FR-120)
+- `PlayerWidget : AppWidgetProvider` with a plain `RemoteViews` layout (`widget_player.xml`: title `TextView` + `ImageButton`); no Glance, so no new dependency. `res/xml/player_widget_info.xml`: `targetCellWidth=4`, `targetCellHeight=1`, `resizeMode=none`, `updatePeriodMillis=0`.
+- State is pushed, not polled: `PlaybackService` has a small player listener that stores title + playing in the in-memory `WidgetState` and calls `PlayerWidget.refresh`; `onDestroy` resets it to idle. `onUpdate` renders from `WidgetState`.
+- Play/Pause: a broadcast PendingIntent to `PlayerWidget`; the receiver connects a `MediaController` (`goAsync`), toggles `playWhenReady`, releases it. When nothing is loaded the button and the title open `MainActivity` instead (an activity cannot be started from a broadcast receiver in the background).
+- Colours: `widget_bg`/`widget_fg` in `values` and `values-night`.
+- Testing: JVM test for the pure `WidgetState` → text/label mapping; emulator test that a toggle intent starts/pauses playback. Looks checked by adding the widget on the emulator.
+
 ## 4. Dependencies (justify each)
 androidx.core, activity-compose, lifecycle-viewmodel-compose, compose BOM + material3, **media3-exoplayer / media3-session / media3-ui** (playback), **work-runtime-ktx** (background), **room-runtime/room-ktx + KSP room-compiler** (episode DB), **okhttp** (+ `mockwebserver` test) (HTTP), datastore-preferences, kotlinx-serialization-json, junit, turbine; step two: **coil-compose + coil-network-okhttp**. Nothing else without a plan amendment.
 

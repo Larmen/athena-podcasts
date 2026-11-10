@@ -66,3 +66,6 @@ person with a phone can check.
 - [ ] Car: the Queue button lists what is next and jumping works; there is no way to edit the queue from the car.
 - [ ] Bike with gloves: the Queue button is reachable and readable.
 
+
+## Home-screen widget (FR-120)
+- [ ] Add the 4 x 1 widget from the launcher's widget picker; it shows "Nothing playing"; start an episode: title appears, Pause works from the widget (with gloves: the button is big enough); tapping the title opens the player; dark mode inverts it.

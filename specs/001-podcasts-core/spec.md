@@ -156,6 +156,8 @@ HTTP Basic-auth feeds (username + password; host-bound `Authorization` header), 
 - Skip amounts: 10 s back, 30 s forward, fixed.
 - Art style default: Grayscale (fits the calm aesthetic); Original is one tap away.
 
+- FR-120 Home-screen widget, 4 × 1 cells, fixed size, deliberately minimal: the title of the episode now playing (one line) and one large **Play/Pause** button (at least 48 dp, in practice about 56 dp). Tapping the title opens the app on the player. Nothing is loaded → it reads "Nothing playing" and the whole widget opens the app. Black on white / white on black following the system light/dark, same type-less monochrome look; no cover art, no skip buttons, no settings. Playing uses the one player (FR-020, FR-022): progress is saved exactly as from the app. No network, no new permissions. [Decided 2026-11-10; skip buttons are a possible later addition.]
+
 ## 10. Open questions
 - Resolved 2026-11-05: both paid feeds use private URLs with a token. HTTP Basic is deferred.
 - Resolved 2026-11-05: launcher bridge uses a signature-level permission. Android signs every APK anyway; debug builds made on this Mac share `~/.android/debug.keystore`, so sideloaded debug builds of both apps already match with no extra work. For release APKs, sign both with one keystore (plan §3.7).

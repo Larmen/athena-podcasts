@@ -53,6 +53,18 @@
             </intent-filter>
         </service>
 
+        <!-- FR-120: the 4 x 1 home-screen widget. -->
+        <receiver
+            android:name=".widget.PlayerWidget"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/player_widget_info" />
+        </receiver>
+
         <!-- FR-080: offered in Android Auto as a media app. -->
         <meta-data
             android:name="com.google.android.gms.car.application"

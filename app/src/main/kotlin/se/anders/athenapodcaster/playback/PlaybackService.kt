@@ -40,6 +40,8 @@ import kotlinx.coroutines.launch
 import se.anders.athenapodcaster.AthenaPodcasterApplication
 import se.anders.athenapodcaster.MainActivity
 import se.anders.athenapodcaster.R
+import se.anders.athenapodcaster.widget.PlayerWidget
+import se.anders.athenapodcaster.widget.WidgetState
 import se.anders.athenapodcaster.data.episodes.EpisodeRepository
 import se.anders.athenapodcaster.domain.NowPlaying
 import se.anders.athenapodcaster.domain.Progress
@@ -114,6 +116,16 @@ class PlaybackService : MediaLibraryService() {
         )
         session = mediaSession
         player.addListener(ProgressSaver(player))
+        // FR-120: the home-screen widget follows the player.
+        player.addListener(object : Player.Listener {
+            override fun onEvents(p: Player, events: Player.Events) {
+                val title = p.currentMediaItem?.let { p.mediaMetadata.title?.toString() }
+                PlayerWidget.refresh(
+                    this@PlaybackService,
+                    WidgetState(title, playing = p.playWhenReady && p.playbackState != Player.STATE_ENDED && p.playbackState != Player.STATE_IDLE),
+                )
+            }
+        })
         // FR-103: the player's upcoming items follow the queue (and a new current item).
         scope.launch {
             container.queue.observe().collect { rows ->
@@ -273,6 +285,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        PlayerWidget.refresh(this, WidgetState())
         ticker?.cancel()
         session?.run {
             player.release()
