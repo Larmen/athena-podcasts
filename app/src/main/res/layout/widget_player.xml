@@ -1,32 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/widget_bg"
-    android:gravity="center_vertical"
-    android:orientation="horizontal">
+    android:background="@color/widget_bg">
 
-    <TextView
+    <!-- Background and title are drawn into one picture, so the app's typeface and text size can be used (FR-120). -->
+    <ImageView
         android:id="@+id/widget_title"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:ellipsize="end"
-        android:gravity="center_vertical"
-        android:maxLines="2"
-        android:paddingStart="16dp"
-        android:paddingEnd="8dp"
-        android:textColor="@color/widget_fg"
-        android:textSize="16sp" />
+        android:contentDescription="@null"
+        android:scaleType="fitXY" />
 
     <ImageButton
         android:id="@+id/widget_play"
         android:layout_width="64dp"
         android:layout_height="match_parent"
+        android:layout_gravity="end"
         android:background="@null"
         android:padding="12dp"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_play"
         android:tint="@color/widget_fg" />
-</LinearLayout>
+</FrameLayout>

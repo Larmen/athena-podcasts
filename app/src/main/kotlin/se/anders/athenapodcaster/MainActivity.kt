@@ -82,6 +82,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by viewModel.settings.collectAsStateWithLifecycle()
             val appearance by viewModel.appearance.collectAsStateWithLifecycle()
+            // FR-120: the home-screen widget wears the same theme, typeface and size.
+            androidx.compose.runtime.LaunchedEffect(appearance) { se.anders.athenapodcaster.widget.PlayerWidget.redraw(this@MainActivity) }
             val launcherAvailable by viewModel.launcherAvailable.collectAsStateWithLifecycle()
             val screen by viewModel.screen.collectAsStateWithLifecycle()
             val backupMessage by viewModel.backupMessage.collectAsStateWithLifecycle()
