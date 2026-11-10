@@ -122,7 +122,8 @@ class PlaybackService : MediaLibraryService() {
                 val title = p.currentMediaItem?.let { p.mediaMetadata.title?.toString() }
                 PlayerWidget.refresh(
                     this@PlaybackService,
-                    WidgetState(title, playing = p.playWhenReady && p.playbackState != Player.STATE_ENDED && p.playbackState != Player.STATE_IDLE),
+                    WidgetState(title, playing = p.playWhenReady && p.playbackState != Player.STATE_ENDED && p.playbackState != Player.STATE_IDLE, mediaId = p.currentMediaItem?.mediaId),
+                    p.mediaMetadata.artworkData,
                 )
             }
         })

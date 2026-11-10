@@ -28,7 +28,7 @@ import se.anders.athenapodcaster.playback.ACTION_OPEN_PLAYER
 import se.anders.athenapodcaster.playback.PlaybackService
 
 /** What the widget shows (FR-120). Pushed by [se.anders.athenapodcaster.playback.PlaybackService]; idle until then. */
-data class WidgetState(val title: String? = null, val playing: Boolean = false) {
+data class WidgetState(val title: String? = null, val playing: Boolean = false, val mediaId: String? = null) {
     val loaded: Boolean get() = !title.isNullOrBlank()
 }
 
@@ -64,9 +64,13 @@ class PlayerWidget : AppWidgetProvider() {
 
         @Volatile var state = WidgetState()
 
+        /** The cover of the episode in [state], already in the app's art style; kept out of the state so it compares cheaply. */
+        @Volatile var art: ByteArray? = null
+
         /** The player changed what is playing. */
-        fun refresh(context: Context, new: WidgetState) {
+        fun refresh(context: Context, new: WidgetState, newArt: ByteArray? = null) {
             if (new == state) return
+            art = newArt
             state = new
             redraw(context)
         }
@@ -85,12 +89,12 @@ class PlayerWidget : AppWidgetProvider() {
                     val o = manager.getAppWidgetOptions(id)
                     val wDp = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 280).coerceAtLeast(120)
                     val hDp = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 64).coerceAtLeast(40)
-                    manager.updateAppWidget(id, views(app, s, appearance, wDp, hDp))
+                    manager.updateAppWidget(id, views(app, s, appearance, wDp, hDp, art.takeIf { s.loaded }))
                 }
             }
         }
 
-        private fun views(context: Context, s: WidgetState, appearance: EffectiveAppearance, wDp: Int, hDp: Int): RemoteViews {
+        private fun views(context: Context, s: WidgetState, appearance: EffectiveAppearance, wDp: Int, hDp: Int, art: ByteArray?): RemoteViews {
             val dark = when (appearance.themeMode) {
                 ThemeMode.Dark -> true
                 ThemeMode.Light -> false
@@ -111,7 +115,7 @@ class PlayerWidget : AppWidgetProvider() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
             val text = if (s.loaded) s.title.orEmpty() else context.getString(R.string.widget_nothing)
-            v.setImageViewBitmap(R.id.widget_title, WidgetPicture.draw(context, text, appearance, wDp, hDp, bg, fg))
+            v.setImageViewBitmap(R.id.widget_title, WidgetPicture.draw(context, text, appearance, wDp, hDp, bg, fg, art))
             v.setImageViewResource(R.id.widget_play, if (s.playing) R.drawable.ic_pause else R.drawable.ic_play)
             v.setColorStateList(R.id.widget_play, "setImageTintList", ColorStateList.valueOf(fg))
             v.setContentDescription(R.id.widget_play, context.getString(if (s.playing) R.string.widget_pause else R.string.widget_play))

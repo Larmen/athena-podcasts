@@ -31,4 +31,14 @@ class WidgetPictureTest {
         assertNotEquals("text size changes the picture", true, light.sameAs2(draw(TypefaceChoice.System, scale = 150)))
         File(context.cacheDir, "widget-vt323-dark.png").outputStream().use { draw(TypefaceChoice.Vt323, dark = true).compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
+
+    @Test
+    fun theCoverFillsTheLeftEnd() {
+        val red = Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+        val bytes = java.io.ByteArrayOutputStream().also { red.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+        val pic = WidgetPicture.draw(context, "Title", EffectiveAppearance(ThemeMode.System, TypefaceChoice.System, 100, false), 300, 70, Color.WHITE, Color.BLACK, bytes)
+        val h = pic.height
+        assertEquals(Color.RED, pic.getPixel(h / 2, h / 2))
+        assertEquals(Color.WHITE, pic.getPixel(h + 2, 2)) // the title area stays plain
+    }
 }
