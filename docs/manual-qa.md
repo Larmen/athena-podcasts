@@ -72,3 +72,6 @@ person with a phone can check.
 
 ## Home-screen widget (FR-120)
 - [ ] Add the 4 x 1 widget from the widget picker; it shows "Nothing playing"; start an episode: title appears, Pause works from the widget (big enough with gloves); tapping the title opens the player; dark mode inverts it.
+
+## Episode details (FR-017)
+- [ ] After a refresh, tap Details on an episode: the sheet fills the width, shows title, podcast, date, duration, size and the show notes; Close works with gloves; long notes scroll; also from the player screen.

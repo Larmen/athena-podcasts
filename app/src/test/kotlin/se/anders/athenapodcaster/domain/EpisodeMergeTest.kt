@@ -69,4 +69,13 @@ class EpisodeMergeTest {
         val m = mergeEpisodes(7, emptyList(), listOf(parsed("a", title = "first"), parsed("a", title = "second")))
         assertEquals("first", m.inserts.single().title)
     }
+
+    @Test
+    fun aRefreshWithoutNotesKeepsTheStoredDescription() {
+        val old = Episode(id = 1, feedId = 1, guid = "g", title = "E", durationSec = 60, enclosureUrl = "https://x.test/a.mp3", enclosureType = "audio/mpeg", enclosureLength = 10, description = "Notes")
+        val none = mergeEpisodes(1, listOf(old), listOf(ParsedEpisode("g", "E", 0, 60, "https://x.test/a.mp3", "audio/mpeg", 10)))
+        assertTrue(none.updates.isEmpty())
+        val fresh = mergeEpisodes(1, listOf(old), listOf(ParsedEpisode("g", "E", 0, 60, "https://x.test/a.mp3", "audio/mpeg", 10, description = "New")))
+        assertEquals("New", fresh.updates.single().description)
+    }
 }

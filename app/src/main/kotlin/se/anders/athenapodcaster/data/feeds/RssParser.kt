@@ -28,6 +28,8 @@ data class ParsedEpisode(
     val enclosureLength: Long?,
     /** `<itunes:image href>` of the episode, when the feed gives one (FR-040). */
     val imageUrl: String? = null,
+    /** Show notes as plain text (FR-017). */
+    val description: String? = null,
 )
 
 class FeedParseException(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -122,6 +124,7 @@ class RssParser(private val newParser: () -> XmlPullParser = { Xml.newPullParser
         var mediaUrl: String? = null // <media:content>, used only when there is no <enclosure>
         var mediaType: String? = null
         var image: String? = null
+        val notes = ArrayList<String>() // description, content:encoded, itunes:summary: the longest wins (FR-017)
         while (true) {
             val ev = p.next()
             if (ev == XmlPullParser.END_DOCUMENT) break
@@ -132,6 +135,7 @@ class RssParser(private val newParser: () -> XmlPullParser = { Xml.newPullParser
                 "guid" -> guid = readText(p)
                 "pubDate" -> pubDate = readText(p)
                 "itunes:duration" -> duration = readText(p)
+                "description", "content:encoded", "itunes:summary" -> notes += readText(p)
                 "enclosure" -> {
                     if (url == null) {
                         url = p.attr("url")?.trim()
@@ -163,6 +167,7 @@ class RssParser(private val newParser: () -> XmlPullParser = { Xml.newPullParser
             enclosureType = type?.ifEmpty { null },
             enclosureLength = length?.takeIf { it > 0 },
             imageUrl = image?.ifEmpty { null },
+            description = notes.map(::showNotesToText).maxByOrNull { it.length }?.ifEmpty { null },
         )
     }
 
@@ -270,4 +275,36 @@ fun parseFeedDate(raw: String?): Long? {
     }
     try { return OffsetDateTime.parse(text).toInstant().toEpochMilli() } catch (_: DateTimeParseException) {}
     return null
+}
+
+private val PARAGRAPH_END = Regex("(?i)</(p|div|h[1-6]|blockquote)\\s*>")
+private val BLOCK_END = Regex("(?i)</(ul|ol)\\s*>|<br\\s*/?>")
+private val LIST_ITEM = Regex("(?i)<li[^>]*>")
+private val TAGS = Regex("<[^>]*>")
+private val ENTITY = Regex("&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);")
+private const val MAX_NOTES = 20_000
+
+/** Show notes: HTML (or plain text) to readable plain text. Paragraphs and list items keep their line breaks (FR-017). */
+fun showNotesToText(raw: String?): String {
+    if (raw.isNullOrBlank()) return ""
+    var t = raw.replace("\r", "")
+    t = LIST_ITEM.replace(t, "\n• ")
+    t = PARAGRAPH_END.replace(t, "\n\n")
+    t = BLOCK_END.replace(t, "\n")
+    t = TAGS.replace(t, "")
+    t = ENTITY.replace(t) { m ->
+        val e = m.groupValues[1]
+        when {
+            e.startsWith("#x") -> e.substring(2).toIntOrNull(16)?.let { String(Character.toChars(it)) }
+            e.startsWith("#") -> e.substring(1).toIntOrNull()?.let { String(Character.toChars(it)) }
+            else -> when (e.lowercase()) {
+                "amp" -> "&"; "lt" -> "<"; "gt" -> ">"; "quot" -> "\""; "apos" -> "'"; "nbsp" -> " "
+                "ndash" -> "–"; "mdash" -> "—"; "hellip" -> "…"; "rsquo", "lsquo" -> "'"; "ldquo", "rdquo" -> "\""
+                else -> null
+            }
+        } ?: m.value
+    }
+    t = t.lines().joinToString("\n") { it.replace(Regex("[ \\t\\u00A0]+"), " ").trim() }
+    t = t.replace(Regex("\n{3,}"), "\n\n").trim()
+    return if (t.length > MAX_NOTES) t.take(MAX_NOTES).trimEnd() + "…" else t
 }

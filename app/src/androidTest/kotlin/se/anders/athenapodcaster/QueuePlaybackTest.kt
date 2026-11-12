@@ -163,6 +163,6 @@ class QueuePlaybackTest {
         runBlocking { container.episodes.fileMissing(b.id) } // "Delete download" on b while a plays (FR-105)
         bFile.delete()
         waitFor("c plays after a, b is skipped") { state().episodeId == c.id && state().isPlaying }
-        assertEquals(emptyList<Long>(), queueIds())
+        waitFor("c leaves the queue") { queueIds().isEmpty() } // removal follows the transition a moment later
     }
 }

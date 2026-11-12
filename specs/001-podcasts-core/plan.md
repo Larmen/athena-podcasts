@@ -146,6 +146,12 @@ Consequences:
 - Appearance: a widget cannot use app fonts, so `WidgetPicture` draws the background and the (max. 2 line) title into one bitmap using the effective appearance (`effectiveAppearance(settings, launcher)`): typeface mapped to a plain `Typeface`, size = 16 sp × text scale × `sizeAdjust`, dark/light from the theme mode. The cover comes from the artwork bytes already on the playing `MediaItem` (made by the same `ArtworkStore` in the chosen style), is centre-cropped square and drawn at the left; the title moves right. The button icon is tinted with `setColorStateList`. `PlayerWidget.redraw` runs on player changes, `onUpdate`, size changes and whenever the app's appearance changes (`MainActivity`).
 - Testing: JVM test for the pure `WidgetState` → text/label mapping; emulator test that a toggle intent starts/pauses playback. Looks checked by adding the widget on the emulator.
 
+### 3.13 Episode details (FR-017)
+- Parser: per `<item>` read `description`, `content:encoded` and `itunes:summary`; the longest wins. `showNotesToText` (pure, JVM-tested) turns the HTML into plain text: `<br>`, `</p>`, `</div>`, `</li>` become line breaks, `<li>` a bullet, other tags dropped, common entities decoded, blank runs collapsed, capped at 20,000 characters.
+- Data: `Episode.description: String?`, DB v5 with `MIGRATION_4_5` (`ALTER TABLE episodes ADD COLUMN description TEXT`), `mergeEpisodes` keeps the old description when a refresh gives none.
+- UI: `EpisodeDetailsSheet` (Material3 `ModalBottomSheet`, skipPartiallyExpanded, scrollable body, Close button) in `ui/components`; opened from a Details button in `EpisodeRow` (right end) and on the player screen.
+- Tests: JVM for `showNotesToText`, parser and merge; emulator migration 4→5.
+
 ## 4. Dependencies (justify each)
 androidx.core, activity-compose, lifecycle-viewmodel-compose, compose BOM + material3, **media3-exoplayer / media3-session / media3-ui** (playback), **work-runtime-ktx** (background), **room-runtime/room-ktx + KSP room-compiler** (episode DB), **okhttp** (+ `mockwebserver` test) (HTTP), datastore-preferences, kotlinx-serialization-json, junit, turbine; step two: **coil-compose + coil-network-okhttp**. Nothing else without a plan amendment.
 

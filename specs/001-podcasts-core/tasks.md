@@ -93,3 +93,9 @@ Order matters. Each task leaves the app building. `[P]` = can run in parallel wi
 - [x] T10.1 (2026-11-10) Spec + plan (FR-120, plan §3.12)
 - [x] T10.2 (2026-11-10) `WidgetState` + `PlayerWidget` + layout/info/colours/manifest; service pushes state
 - [~] T10.3 (2026-11-10; 2 JVM + 1 emulator test pass, lint clean; the look on a real home screen was not seen) Tests (JVM mapping, emulator toggle), look checked on the emulator; README/manual QA line
+
+## Phase 11 – Episode details · FR-017
+- [x] T11.1 (2026-11-12) Spec + plan (FR-017, plan §3.13)
+- [x] T11.2 (2026-11-12; 4 JVM tests, migration 4→5 emulator test) Parser + `showNotesToText`, `Episode.description`, DB v5 + migration, merge
+- [~] T11.3 (2026-11-12; builds, lint clean; the sheet was not looked at on a screen) `EpisodeDetailsSheet`, Details button on episode rows and the player
+- [~] T11.4 (2026-11-12) JVM and emulator suites green; not yet tried on the phone Tests, emulator look, install

@@ -41,6 +41,7 @@ import se.anders.athenapodcaster.data.db.Feed
 import se.anders.athenapodcaster.domain.EpisodeFilter
 import se.anders.athenapodcaster.ui.MarkAllInfo
 import se.anders.athenapodcaster.ui.components.ArtImage
+import se.anders.athenapodcaster.ui.components.EpisodeDetailsSheet
 import se.anders.athenapodcaster.ui.components.MarkPlayedDialog
 import se.anders.athenapodcaster.ui.components.hasArt
 import se.anders.athenapodcaster.ui.feeds.errorText
@@ -83,6 +84,7 @@ fun EpisodeListScreen(
     var confirmPlayedId by rememberSaveable { mutableStateOf<Long?>(null) }
     var confirmAll by rememberSaveable { mutableStateOf(false) }
     var confirmDeleteId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var detailsId by rememberSaveable { mutableStateOf<Long?>(null) }
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         // FlowRow, not Row: at large font sizes the buttons wrap onto a second line instead of squeezing each other out.
         FlowRow(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalArrangement = Arrangement.Center) {
@@ -128,9 +130,13 @@ fun EpisodeListScreen(
                 scrolledToPlaying = true
             }
             LazyColumn(Modifier.fillMaxSize(), state = listState) {
-                items(episodes, key = { it.id }) { EpisodeRow(it, feed?.imageUrl, it.id in queuedIds, it.id == playingEpisodeId && isPlaying, onPause, onPlay, onToggleQueue, onMarkUnplayed, { e -> confirmPlayedId = e.id }, onDownload, onCancelDownload) { e -> confirmDeleteId = e.id } }
+                items(episodes, key = { it.id }) { EpisodeRow(it, feed?.imageUrl, it.id in queuedIds, it.id == playingEpisodeId && isPlaying, onPause, onPlay, onToggleQueue, onMarkUnplayed, { e -> confirmPlayedId = e.id }, onDownload, onCancelDownload, { e -> detailsId = e.id }) { e -> confirmDeleteId = e.id } }
             }
         }
+    }
+    detailsId?.let { id ->
+        val episode = episodes.firstOrNull { it.id == id }
+        if (episode == null) detailsId = null else EpisodeDetailsSheet(episode, feed?.title.orEmpty()) { detailsId = null }
     }
     if (confirmAll) {
         val unplayed = markAllInfo.unplayed
@@ -200,6 +206,7 @@ private fun EpisodeRow(
     onAskMarkPlayed: (Episode) -> Unit,
     onDownload: (Episode) -> Unit,
     onCancel: (Episode) -> Unit,
+    onDetails: (Episode) -> Unit,
     onDelete: (Episode) -> Unit,
 ) {
     val stateText = stringResource(
@@ -241,7 +248,9 @@ private fun EpisodeRow(
         // The buttons line up with the text above (title, date, state), not with the picture, so each episode reads as one group.
         // A TextButton insets its label by 12 dp, which is taken back so the first label starts exactly where the title does.
         val textStart = if (hasArt(art)) 72.dp else 0.dp
-        FlowRow(Modifier.padding(start = textStart).offset(x = (-12).dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        // Details sits at the right end of the same row (FR-017).
+        Row(Modifier.padding(start = textStart).offset(x = (-12).dp), verticalAlignment = Alignment.Bottom) {
+        FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             when (episode.downloadState) {
                     DownloadState.Done -> {
                         TextButton(modifier = Modifier.semantics { contentDescription = playLabel }, onClick = { if (playing) onPause() else onPlay(episode) }) { Text(playText) }
@@ -264,6 +273,9 @@ private fun EpisodeRow(
             ) {
                     Text(stringResource(if (episode.played) R.string.mark_unplayed else R.string.mark_played))
                 }
+        }
+        val detailsLabel = stringResource(R.string.episode_details) + ", " + episode.title
+        TextButton(modifier = Modifier.semantics { contentDescription = detailsLabel }, onClick = { onDetails(episode) }) { Text(stringResource(R.string.episode_details)) }
         }
     }
 }

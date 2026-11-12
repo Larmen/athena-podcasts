@@ -11,6 +11,7 @@ import se.anders.athenapodcaster.data.feeds.FeedParseException
 import se.anders.athenapodcaster.data.feeds.RssParser
 import se.anders.athenapodcaster.data.feeds.parseDuration
 import se.anders.athenapodcaster.data.feeds.parseFeedDate
+import se.anders.athenapodcaster.data.feeds.showNotesToText
 
 class RssParserTest {
     private val parser = RssParser { KXmlParser() }
@@ -180,5 +181,28 @@ class RssParserTest {
         assertEquals(expected, parseFeedDate("  Tue,  03 Nov 2026   06:00:00 +0000 "))
         assertNull(parseFeedDate("yesterday"))
         assertNull(parseFeedDate(""))
+    }
+
+    @Test
+    fun showNotesKeepParagraphsAndListsAndDropMarkup() {
+        val text = showNotesToText("<p>First &amp; <b>best</b></p><p>Second<br/>line</p><ul><li>One</li><li>Two &#8211; ok</li></ul>")
+        assertEquals("First & best\n\nSecond\nline\n\n• One\n• Two – ok", text)
+        assertEquals("", showNotesToText("  "))
+    }
+
+    @Test
+    fun theLongestOfDescriptionAndContentEncodedBecomesTheEpisodeDescription() {
+        val feed = parse(
+            """<?xml version="1.0"?><rss xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>S</title>
+            <item><title>E</title><guid>g</guid><enclosure url="https://x.test/a.mp3" type="audio/mpeg"/>
+            <description>Short</description><content:encoded><![CDATA[<p>The long show notes</p>]]></content:encoded></item></channel></rss>""",
+        )
+        assertEquals("The long show notes", feed.episodes.single().description)
+    }
+
+    @Test
+    fun anEpisodeWithoutNotesHasNoDescription() {
+        val feed = parse("""<?xml version="1.0"?><rss><channel><title>S</title><item><title>E</title><enclosure url="https://x.test/a.mp3" type="audio/mpeg"/></item></channel></rss>""")
+        assertNull(feed.episodes.single().description)
     }
 }

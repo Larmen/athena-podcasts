@@ -54,6 +54,25 @@ class MigrationTest {
     }
 
     @Test
+    fun migrate4To5AddsEpisodeDescriptionAndKeepsData() {
+        helper.createDatabase("migration-test-5", 4).apply {
+            execSQL("INSERT INTO feeds (id, url, urlHash, title, isPrivate, lastRefreshAt) VALUES (1, 'https://a.test/f', 'h1', 'Feed', 0, 5)")
+            execSQL(
+                "INSERT INTO episodes (id, feedId, guid, title, publishedAt, enclosureUrl, downloadState, positionMs, played, downloadedBytes, downloadTotalBytes) " +
+                    "VALUES (10, 1, 'g', 'Ep', 7, 'https://a.test/a.mp3', 'None', 1234, 0, 0, 0)",
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate("migration-test-5", 5, true, AppDatabase.MIGRATION_4_5)
+        db.query("SELECT title, positionMs, description FROM episodes WHERE id = 10").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("Ep", c.getString(0))
+            assertEquals(1234L, c.getLong(1))
+            assertEquals(null, c.getString(2))
+        }
+    }
+
+    @Test
     fun migrate1To2MovesPrivateUrlsIntoTheSecretStoreAndKeepsEverythingElse() {
         val secrets = InMemorySecretStore()
         val publicUrl = "https://pub.test/feed.xml"

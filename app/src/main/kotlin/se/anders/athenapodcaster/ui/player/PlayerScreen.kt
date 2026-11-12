@@ -31,6 +31,7 @@ import se.anders.athenapodcaster.data.db.DownloadState
 import se.anders.athenapodcaster.data.db.Episode
 import se.anders.athenapodcaster.playback.PlayerUiState
 import se.anders.athenapodcaster.ui.components.ArtImage
+import se.anders.athenapodcaster.ui.components.EpisodeDetailsSheet
 import se.anders.athenapodcaster.ui.components.MarkPlayedDialog
 import se.anders.athenapodcaster.ui.components.PlayPauseButton
 import se.anders.athenapodcaster.ui.components.SkipButton
@@ -54,6 +55,8 @@ fun PlayerScreen(
     onMarkPlayed: () -> Unit,
 ) {
     var confirmPlayed by rememberSaveable { mutableStateOf(false) }
+    var showDetails by rememberSaveable { mutableStateOf(false) }
+    if (showDetails && episode != null) EpisodeDetailsSheet(episode, state.show) { showDetails = false }
     if (confirmPlayed && episode != null) {
         MarkPlayedDialog(
             hasDownload = episode.downloadState == DownloadState.Done,
@@ -94,10 +97,11 @@ fun PlayerScreen(
             SkipButton(forward = true, seconds = 30, onClick = onSeekForward, size = 72.dp, iconSize = 44.dp)
         }
         Spacer(Modifier.height(16.dp))
-        if (episode != null) {
+        if (episode != null) Row {
             TextButton(onClick = { if (episode.played) onMarkUnplayed() else confirmPlayed = true }) {
                 Text(stringResource(if (episode.played) R.string.mark_unplayed else R.string.mark_played))
             }
+            TextButton(onClick = { showDetails = true }) { Text(stringResource(R.string.episode_details)) }
         }
     }
 }

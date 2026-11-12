@@ -183,4 +183,7 @@
     <string name="widget_nothing">Nothing playing</string>
     <string name="widget_play">Play</string>
     <string name="widget_pause">Pause</string>
+    <string name="episode_details">Details</string>
+    <string name="details_close">Close</string>
+    <string name="details_none">This episode has no description in the feed.</string>
 </resources>

@@ -10,7 +10,7 @@ import se.anders.athenapodcaster.data.feeds.redactUrl
 import se.anders.athenapodcaster.data.feeds.urlHash
 import se.anders.athenapodcaster.data.secrets.SecretStore
 
-@Database(entities = [Feed::class, Episode::class, QueueItem::class], version = 4, exportSchema = true)
+@Database(entities = [Feed::class, Episode::class, QueueItem::class], version = 5, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun feedDao(): FeedDao
     abstract fun episodeDao(): EpisodeDao
@@ -19,8 +19,15 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context, secrets: SecretStore): AppDatabase =
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "podcaster.db")
-                .addMigrations(migration1To2(secrets), MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(migration1To2(secrets), MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
+
+        /** v5 (T11.2): episode show notes. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE episodes ADD COLUMN description TEXT")
+            }
+        }
 
         /** v4 (T9.1): the play queue. */
         val MIGRATION_3_4 = object : Migration(3, 4) {

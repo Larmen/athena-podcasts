@@ -31,6 +31,7 @@ fun mergeEpisodes(feedId: Long, existing: List<Episode>, parsed: List<ParsedEpis
                 enclosureType = p.enclosureType,
                 enclosureLength = p.enclosureLength,
                 imageUrl = p.imageUrl,
+                description = p.description,
             )
         } else {
             val refreshed = old.copy(
@@ -41,6 +42,7 @@ fun mergeEpisodes(feedId: Long, existing: List<Episode>, parsed: List<ParsedEpis
                 enclosureType = p.enclosureType ?: old.enclosureType,
                 enclosureLength = p.enclosureLength ?: old.enclosureLength,
                 imageUrl = p.imageUrl ?: old.imageUrl,
+                description = p.description ?: old.description,
             )
             if (refreshed != old) updates += refreshed
         }

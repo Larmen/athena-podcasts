@@ -52,6 +52,8 @@ data class Episode(
     val downloadedBytes: Long = 0,
     val downloadTotalBytes: Long = 0,
     val imageUrl: String? = null,
+    /** Show notes as plain text (FR-017). */
+    val description: String? = null,
 )
 
 /** An episode waiting in the play queue (spec §6, FR-100). Rows disappear with their episode. */
